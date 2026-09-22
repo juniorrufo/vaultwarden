@@ -134,8 +134,8 @@ A aplicação opera sob controle estrito:
 ## 8. Estratégia de Backup
 
 O processo de proteção dos dados opera em camadas:
-1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo.
-2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente isolado, confirmando a recuperação dos cofres e das credenciais.
+1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true).
+2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente temporário isolado, confirmando a recuperação dos cofres e das credenciais sem afetar a produção.
 3. **Backup da VM:** Snapshot de baseline da VM Debian validado via Proxmox Backup Server (PBS).
 
 Consulte [`docs/BACKUP.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/BACKUP.md) e [`docs/RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md) para detalhes operacionais.
@@ -195,11 +195,11 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - [x] Bloqueio de novos cadastros (`SIGNUPS_ALLOWED=false`) e convites (`INVITATIONS_ALLOWED=false`).
 - [x] Criação e execução manual do script de backup `/usr/local/sbin/vaultwarden-backup`.
 - [x] Validação de integridade de arquivos TAR (`tar -tzf`) e hashes SHA-256 (`sha256sum -c`).
-- [x] Teste real de restauração de desastre executado com sucesso em container isolado.
+- [x] Teste real de restauração de desastre executado com sucesso em ambiente temporário isolado.
+- [x] Automação de backup agendado via timer e serviço systemd (`vaultwarden-backup.service` Type=oneshot e `vaultwarden-backup.timer` diariamente às 03:00, Persistent=true) ativo e com execução manual validada (backup `vaultwarden_20260922_173509.tar.gz` gerado com sha256 íntegro e container healthy; próxima execução prevista para 23/09/2026 às 03:00).
 - [x] Snapshot de baseline da VM validado via Proxmox Backup Server (PBS).
 
 ### ⚠️ Pendente (Trabalhos Planejados Futuros)
-- [ ] **Automação Definitiva de Backup:** Criação e habilitação de serviço e timer no systemd (`vaultwarden-backup.service` e `vaultwarden-backup.timer`) para execução diária automática.
 - [ ] **Política de Retenção Local:** Implementação de expiração automatizada para retenção de 14 backups diários em `/var/backups/vaultwarden/`.
 - [ ] **Monitoramento via Zabbix:** Configuração de monitoramento de sucesso/falha do timer de backup e métricas de integridade.
 - [ ] **Backup Off-site em Nuvem (OCI):** Configuração de repositório criptografado via Restic em bucket privado no Oracle Cloud Infrastructure (OCI).

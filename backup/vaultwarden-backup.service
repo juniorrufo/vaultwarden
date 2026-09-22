@@ -1,0 +1,11 @@
+[Unit]
+Description=Vaultwarden Backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vaultwarden-backup
+UMask=0077
+NoNewPrivileges=true
+TimeoutStartSec=20min

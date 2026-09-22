@@ -1370,36 +1370,59 @@ tested.
 
 ---
 
-# 37. Backup Automation — Pending
+# 37. Backup Automation
 
-The backup script works manually.
+Backup execution is automated using systemd timer and service units.
 
-The next planned step is:
-
-```text
-systemd service
-+
-systemd timer
-```
-
-Expected architecture:
+Architecture:
 
 ```text
 vaultwarden-backup.timer
-        |
-        v
+        ↓
 vaultwarden-backup.service
-        |
-        v
+        ↓
 /usr/local/sbin/vaultwarden-backup
+        ↓
+native SQLite backup
+        ↓
+archive + SHA-256
+        ↓
+/var/backups/vaultwarden/
 ```
 
-The timer should run daily.
+### Components:
+
+- Service Unit: `/etc/systemd/system/vaultwarden-backup.service`
+  - `Type=oneshot`
+  - `Requires=docker.service`
+  - `After=docker.service`
+  - `ExecStart=/usr/local/sbin/vaultwarden-backup`
+  - `UMask=0077`
+  - `NoNewPrivileges=true`
+  - `TimeoutStartSec=20min`
+
+- Timer Unit: `/etc/systemd/system/vaultwarden-backup.timer`
+  - Schedule: `OnCalendar=*-*-* 03:00:00` (daily at 03:00)
+  - `Persistent=true`
+  - `WantedBy=timers.target`
+  - State: enabled and active
+
+### Validation Status:
+
+- The backup script was previously validated.
+- `vaultwarden-backup.service` was created as `Type=oneshot`, depending on `docker.service`.
+- `vaultwarden-backup.timer` was created, enabled, and is active waiting for the next execution.
+- Manual execution of the service was performed successfully (`systemctl start vaultwarden-backup.service`).
+- The backup `vaultwarden_20260922_173509.tar.gz` was created successfully.
+- The corresponding `.sha256` checksum file was created and validated.
+- Vaultwarden finished the process in `running/healthy` state.
+- The next timer execution was shown by systemd for 03:00 of 2026-09-23.
+- Automatic execution at the scheduled time has NOT yet been observed, therefore it is not documented as a completed automatic test.
 
 Important:
 
-The automation should produce an observable success/failure state that can
-later be monitored by Zabbix.
+The automation produces an observable success/failure state that can later be
+monitored by Zabbix.
 
 ---
 
@@ -1705,6 +1728,7 @@ Signup disabled                      DONE
 Backup script                        DONE
 Backup integrity test                DONE
 Backup restore test                  DONE
+Systemd backup timer                 DONE
 Proxmox/PBS baseline backup          DONE
 ```
 
@@ -1715,7 +1739,6 @@ Proxmox/PBS baseline backup          DONE
 The following tasks are NOT yet complete:
 
 ```text
-Systemd backup timer
 Backup retention automation
 Zabbix backup monitoring
 OCI Object Storage repository

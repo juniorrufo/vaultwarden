@@ -126,11 +126,11 @@ Este documento registra formalmente as principais decisões arquiteturais tomada
 
 - **Contexto:** Garantir a salvaguarda dos dados criptografados sem provocar inconsistências no banco durante a gravação.
 - **Motivo:** Copiar o banco SQLite a quente com o container em execução pode capturar transações incompletas no arquivo `-wal`. Além disso, criar backups sem verificar estruturalmente o arquivo e sem testar a restauração em laboratório cria uma ilusão de segurança perigosa.
-- **Escolha:** Criar o script `/usr/local/sbin/vaultwarden-backup` que executa o comando atômico de backup embutido no Vaultwarden, para o container de forma limpa, empacota `/opt/vaultwarden/data` em `.tar.gz`, gera e valida o checksum SHA-256 e confirma a estrutura com `tar -tzf`; somado à execução de um teste prático de restauração em container isolado.
+- **Escolha:** Criar o script `/usr/local/sbin/vaultwarden-backup` que executa o comando atômico de backup embutido no Vaultwarden, para o container de forma limpa, empacota `/opt/vaultwarden/data` em `.tar.gz`, gera e valida o checksum SHA-256 e confirma a estrutura com `tar -tzf`, automatizado via systemd (`vaultwarden-backup.timer` e `vaultwarden-backup.service`); somado à execução de um teste prático de restauração em ambiente temporário isolado.
 - **Alternativas consideradas:**
   - Script simples de `tar` sobre a pasta `/data` ativa sem parar a aplicação (descartado pelo risco de inconsistência no SQLite).
   - Apenas snapshot de VM no Proxmox (descartado porque o backup em nível de aplicação provê granularidade para restaurar apenas o banco sem precisar reinstalar a VM inteira).
-- **Consequências:** Processo de backup seguro, íntegro e com restauração já validada em ambiente de testes.
+- **Consequências:** Processo de backup seguro, íntegro, automatizado via systemd e com restauração já validada em ambiente de testes.
 
 ---
 

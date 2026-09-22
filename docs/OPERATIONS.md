@@ -131,7 +131,44 @@ A imagem Docker é propositalmente fixada por **digest SHA-256** para evitar atu
 
 ---
 
-## 5. Matriz de Troubleshooting Ordenado
+## 5. Operação e Monitoramento do Backup Agendado (Systemd)
+
+O backup da aplicação é agendado e executado através das unidades `vaultwarden-backup.timer` e `vaultwarden-backup.service`.
+
+### 5.1. Verificar Estado do Agendador (Timer)
+Checar se o timer está ativo e qual o horário do próximo disparo:
+```bash
+sudo systemctl status vaultwarden-backup.timer
+```
+*Saída esperada:* `Active: active (waiting)`
+
+Listar todos os timers do sistema e localizar o agendamento:
+```bash
+sudo systemctl list-timers | grep vaultwarden
+```
+*Horário padrão:* diariamente às 03:00 da madrugada (`Persistent=true`).
+
+### 5.2. Disparo Manual do Backup via Systemd
+Para testar a rotina pelo mesmo mecanismo de serviço que o timer utiliza:
+```bash
+sudo systemctl start vaultwarden-backup.service
+```
+
+### 5.3. Acompanhamento dos Logs do Serviço
+Inspecionar a saída da última execução do backup:
+```bash
+sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
+```
+
+### 5.4. Execução Manual Direta pelo Script
+Caso seja necessário disparar o backup diretamente pelo shell:
+```bash
+sudo /usr/local/sbin/vaultwarden-backup
+```
+
+---
+
+## 6. Matriz de Troubleshooting Ordenado
 
 Ao investigar qualquer indisponibilidade, siga rigorosamente esta ordem de camadas:
 
@@ -155,7 +192,7 @@ Ao investigar qualquer indisponibilidade, siga rigorosamente esta ordem de camad
 
 ---
 
-## 6. Distinção de Camadas de Disponibilidade
+## 7. Distinção de Camadas de Disponibilidade
 
 Para evitar diagnósticos incorretos, mantenha em mente que estas situações representam níveis operacionais distintos:
 

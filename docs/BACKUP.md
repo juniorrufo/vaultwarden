@@ -72,45 +72,109 @@ O script opera com controle de concorrência (lock) e executa o seguinte fluxo:
 
 ---
 
-## 3. Comandos Reais de Validação
+## 3. Automação do Backup via Systemd (Timer e Service)
 
-Para auditar manualmente um backup existente em `/var/backups/vaultwarden/`:
+A execução do backup é automatizada por meio de unidades dedicadas do systemd integradas ao ciclo de vida do host e do Docker.
 
-### 3.1. Listar Backups Existentes
+### 3.1. Arquitetura da Automação
+
+```text
+vaultwarden-backup.timer
+        ↓
+vaultwarden-backup.service
+        ↓
+/usr/local/sbin/vaultwarden-backup
+        ↓
+native SQLite backup
+        ↓
+archive + SHA-256
+        ↓
+/var/backups/vaultwarden/
+```
+
+### 3.2. Unidades Systemd Implementadas
+
+As definições estão versionadas no repositório em `backup/` e instaladas em `/etc/systemd/system/`:
+
+- **Service Unit (`/etc/systemd/system/vaultwarden-backup.service`):**
+  - `Type=oneshot`: Executa o script até sua conclusão e encerra.
+  - `Requires=docker.service` e `After=docker.service`: Garante que o serviço de backup só inicie com o Docker operacional.
+  - `ExecStart=/usr/local/sbin/vaultwarden-backup`: Aciona o script principal.
+  - `UMask=0077`: Garante que arquivos gerados sejam lidos apenas pelo superusuário.
+  - `NoNewPrivileges=true`: Previne escalonamento de privilégios.
+  - `TimeoutStartSec=20min`: Janela de tolerância para conclusão de cópias e healthcheck.
+
+- **Timer Unit (`/etc/systemd/system/vaultwarden-backup.timer`):**
+  - `OnCalendar=*-*-* 03:00:00`: Disparo diário programado para as 03:00 da madrugada.
+  - `Persistent=true`: Caso a VM esteja desligada no horário programado, o systemd dispara o backup imediatamente após a inicialização.
+  - `WantedBy=timers.target`: Ativado automaticamente no boot do sistema operacional.
+
+### 3.3. Estado Validado da Automação
+
+- [x] O script de backup `/usr/local/sbin/vaultwarden-backup` já existia e foi validado previamente.
+- [x] O serviço `vaultwarden-backup.service` foi criado como `Type=oneshot` com dependência direta de `docker.service`.
+- [x] O timer `vaultwarden-backup.timer` foi criado, habilitado e colocado em estado ativo (`active (waiting)`).
+- [x] A execução MANUAL do serviço foi disparada via `sudo systemctl start vaultwarden-backup.service` e concluída com sucesso.
+- [x] O arquivo de backup `vaultwarden_20260922_173509.tar.gz` foi criado com sucesso em `/var/backups/vaultwarden/`.
+- [x] O arquivo de checksum correspondente (`.sha256`) foi gerado e conferido com integridade.
+- [x] O container do Vaultwarden reiniciou e concluiu o ciclo em estado `running/healthy`.
+- [x] O agendamento da próxima execução foi registrado pelo systemd para 23/09/2026 às 03:00.
+- [ ] *Ressalva importante:* A execução automática no horário agendado (madrugada) ainda **não** foi observada em produção; portanto, não deve ser documentada como teste automático concluído.
+
+---
+
+## 4. Comandos Reais de Validação
+
+Para auditar os backups existentes e o estado do agendador:
+
+### 4.1. Listar Backups Existentes
 ```bash
 ls -lh /var/backups/vaultwarden/
 ```
 
-### 3.2. Validar Checksum SHA-256
+### 4.2. Validar Checksum SHA-256
 ```bash
 cd /var/backups/vaultwarden/
-sha256sum -c vaultwarden_20260922_155527.tar.gz.sha256
+sha256sum -c vaultwarden_20260922_173509.tar.gz.sha256
 ```
-*Resultado esperado:* `vaultwarden_20260922_155527.tar.gz: OK`
+*Resultado esperado:* `vaultwarden_20260922_173509.tar.gz: OK`
 
-### 3.3. Inspecionar Conteúdo do TAR sem Extrair
+### 4.3. Inspecionar Conteúdo do TAR sem Extrair
 ```bash
-tar -tzvf /var/backups/vaultwarden/vaultwarden_20260922_155527.tar.gz
+tar -tzvf /var/backups/vaultwarden/vaultwarden_20260922_173509.tar.gz
 ```
 *Arquivos esperados no arquivo:*
-- `db.sqlite3`
-- `rsa_key.pem`
-- `icon_cache/`
+- `./db.sqlite3`
+- `./rsa_key.pem`
+- `./icon_cache/`
+
+### 4.4. Verificar Status do Timer e Próximo Disparo
+```bash
+sudo systemctl status vaultwarden-backup.timer
+sudo systemctl list-timers | grep vaultwarden
+```
+
+### 4.5. Consultar Logs da Última Execução do Serviço
+```bash
+sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
+```
 
 ---
 
-## 4. O que foi EFETIVAMENTE TESTADO vs O que é PLANEJADO
+## 5. O que foi EFETIVAMENTE TESTADO vs O que é PLANEJADO
 
 ### ✅ Estado Atual Testado e Validado em Produção
 - [x] Execução manual bem-sucedida do script `/usr/local/sbin/vaultwarden-backup`.
-- [x] Criação de arquivo `.tar.gz` consistente com dados persistentes.
+- [x] Criação de arquivos `.tar.gz` consistentes com dados persistentes.
 - [x] Validação estrutural do arquivo via `tar -tzf`.
-- [x] Geração e verificação íntegra do hash via `sha256sum -c`.
-- [x] Teste prático de restauração dos dados em container isolado (ver [`RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md)).
+- [x] Geração e verificação íntegra do hash via `sha256sum -c` (validado no arquivo `vaultwarden_20260922_173509.tar.gz`).
+- [x] Teste prático de restauração dos dados em ambiente temporário isolado (ver [`RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md)).
+- [x] Implementação de `vaultwarden-backup.service` e `vaultwarden-backup.timer` no systemd.
+- [x] Disparo manual do serviço systemd com término em container saudável e agendamento confirmado para o dia seguinte às 03:00.
 - [x] Backup de baseline da VM no Proxmox VE / PBS validado com sucesso.
 
 ### ⚠️ Itens Pendentes (Não documentar como implementados)
-- [ ] **Automação via Systemd:** Criação e ativação do `vaultwarden-backup.service` e `vaultwarden-backup.timer` para execução diária automática.
+- [ ] **Observação de Disparo Automático Agendado:** Registro da primeira execução real noturna disparada automaticamente pelo timer.
 - [ ] **Política de Retenção Local:** Automação de descarte de backups antigos (meta: retenção de 14 dias diários).
 - [ ] **Monitoramento via Zabbix:** Coleta e alertas do status de sucesso/falha da rotina de backup.
 - [ ] **Backup Off-site em Nuvem (OCI):** Criação de bucket privado no Oracle Cloud Infrastructure, configuração do Restic com encriptação client-side e chave dedicada com privilégios mínimos.

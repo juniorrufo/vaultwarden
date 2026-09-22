@@ -1,0 +1,158 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+DATA_DIR="/opt/vaultwarden/data"
+BACKUP_DIR="/var/backups/vaultwarden"
+STAGE_BASE="/var/lib/vaultwarden-backup"
+CONTAINER="vaultwarden"
+
+TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
+ARCHIVE="${BACKUP_DIR}/vaultwarden_${TIMESTAMP}.tar.gz"
+CHECKSUM="${ARCHIVE}.sha256"
+
+LOCK_FILE="/run/lock/vaultwarden-backup.lock"
+
+exec 9>"${LOCK_FILE}"
+flock -n 9 || {
+    echo "Outro backup do Vaultwarden já está em execução."
+    exit 1
+}
+
+cleanup() {
+    rm -rf -- "${STAGE_DIR:-}"
+}
+
+start_container() {
+    if docker container inspect "${CONTAINER}" >/dev/null 2>&1; then
+        if [[ "$(docker inspect -f '{{.State.Status}}' "${CONTAINER}")" != "running" ]]; then
+            docker start "${CONTAINER}" >/dev/null
+        fi
+    fi
+}
+
+wait_healthy() {
+    local status
+
+    for _ in {1..36}; do
+        status="$(docker inspect \
+            -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' \
+            "${CONTAINER}")"
+
+        case "${status}" in
+            healthy)
+                return 0
+                ;;
+            unhealthy)
+                echo "Vaultwarden ficou unhealthy."
+                return 1
+                ;;
+            starting|unknown)
+                sleep 5
+                ;;
+            *)
+                echo "Estado inesperado do healthcheck: ${status}"
+                sleep 5
+                ;;
+        esac
+    done
+
+    echo "Timeout aguardando Vaultwarden ficar healthy."
+    return 1
+}
+
+trap 'start_container || true; cleanup' EXIT
+
+# 1. Verificar container
+if ! docker container inspect "${CONTAINER}" >/dev/null 2>&1; then
+    echo "Container ${CONTAINER} não existe."
+    exit 1
+fi
+
+if [[ "$(docker inspect -f '{{.State.Status}}' "${CONTAINER}")" != "running" ]]; then
+    echo "Container ${CONTAINER} não está em execução."
+    exit 1
+fi
+
+if [[ "$(docker inspect -f '{{.State.Health.Status}}' "${CONTAINER}")" != "healthy" ]]; then
+    echo "Vaultwarden não está healthy."
+    exit 1
+fi
+
+# 2. Gerar backup consistente do SQLite pelo próprio Vaultwarden
+BACKUP_OUTPUT="$(docker exec "${CONTAINER}" /vaultwarden backup)"
+
+DB_RELATIVE="$(printf '%s\n' "${BACKUP_OUTPUT}" \
+    | sed -n "s/^Backup to '\(.*\)' was successful$/\1/p")"
+
+if [[ -z "${DB_RELATIVE}" ]]; then
+    echo "Não foi possível identificar o backup SQLite gerado."
+    echo "${BACKUP_OUTPUT}"
+    exit 1
+fi
+
+DB_FILE="${DATA_DIR}/${DB_RELATIVE#data/}"
+
+if [[ ! -f "${DB_FILE}" ]]; then
+    echo "Arquivo de backup SQLite não encontrado: ${DB_FILE}"
+    exit 1
+fi
+
+# 3. Criar staging
+STAGE_DIR="$(mktemp -d "${STAGE_BASE}/stage.XXXXXX")"
+chmod 700 "${STAGE_DIR}"
+
+# 4. Parar o Vaultwarden para capturar o restante do /data de forma consistente
+docker stop --time=30 "${CONTAINER}" >/dev/null
+
+# 5. Copiar dados não relacionados ao banco live
+tar \
+    -C "${DATA_DIR}" \
+    --exclude='./db.sqlite3' \
+    --exclude='./db.sqlite3-wal' \
+    --exclude='./db.sqlite3-shm' \
+    --exclude='./db_*.sqlite3' \
+    --exclude='./tmp' \
+    -cf - . \
+    | tar -C "${STAGE_DIR}" -xf -
+
+# 6. Colocar a cópia consistente do banco como db.sqlite3
+install -o root -g root -m 600 \
+    "${DB_FILE}" \
+    "${STAGE_DIR}/db.sqlite3"
+
+# 7. Gerar o archive
+tar \
+    -C "${STAGE_DIR}" \
+    -czf "${ARCHIVE}" \
+    .
+
+# 8. Verificações mínimas do conteúdo do backup
+tar -tzf "${ARCHIVE}" | grep -qx './db.sqlite3'
+tar -tzf "${ARCHIVE}" | grep -qx './rsa_key.pem'
+
+chmod 600 "${ARCHIVE}"
+
+# 9. Gerar checksum
+sha256sum "${ARCHIVE}" > "${CHECKSUM}"
+chmod 600 "${CHECKSUM}"
+
+# 10. Remover backups SQLite temporários gerados dentro do /data
+find "${DATA_DIR}" \
+    -maxdepth 1 \
+    -type f \
+    -name 'db_*.sqlite3' \
+    -delete
+
+# 11. Subir o Vaultwarden novamente
+docker start "${CONTAINER}" >/dev/null
+wait_healthy
+
+# 12. Validar archive
+tar -tzf "${ARCHIVE}" >/dev/null
+
+# 13. Validar checksum
+sha256sum -c "${CHECKSUM}"
+
+echo "Backup concluído:"
+echo "  ${ARCHIVE}"
+echo "  ${CHECKSUM}"
