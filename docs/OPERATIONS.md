@@ -179,6 +179,11 @@ Para inspecionar arquivos com mais de 10 dias (que serão expurgados na próxima
 sudo find /var/backups/vaultwarden -maxdepth 1 -type f -name 'vaultwarden_*.tar.gz' -mmin +14400
 ```
 
+### 5.6. Estado do Monitoramento e Limitações Conhecidas
+- **Ausência de Monitoramento Centralizado:** Atualmente não existe um servidor Zabbix em produção para este ambiente. Por esta razão, nenhum template, script ou integração com Zabbix foi implementada nesta etapa.
+- **Forma de Verificação:** A validação do funcionamento dos backups é exclusivamente local, inspecionando os logs do serviço (`journalctl -u vaultwarden-backup.service`), o agendamento do timer (`systemctl list-timers`) e a integridade dos arquivos em `/var/backups/vaultwarden/`.
+- **Evolução Futura:** A ausência de alertas ativos remotos em caso de falha é uma limitação operacional conhecida; a integração com Zabbix é classificada como melhoria futura / evolução e não impacta o funcionamento do backup local implementado.
+
 ---
 
 ## 6. Matriz de Troubleshooting Ordenado

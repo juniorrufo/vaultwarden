@@ -1417,8 +1417,9 @@ archive + SHA-256
 
 Important:
 
-The automation produces an observable success/failure state that can later be
-monitored by Zabbix.
+Currently, there is NO centralized monitoring server (such as Zabbix) deployed in production for this environment.
+Operational verification relies directly on systemd service logs (`journalctl -u vaultwarden-backup.service`), timer inspection (`systemctl list-timers`), and verifying generated archive files and checksums in `/var/backups/vaultwarden/`.
+The absence of proactive centralized alerting is a known limitation, and centralized backup monitoring via Zabbix is categorized as a future improvement / evolution, not a prerequisite for local backup.
 
 ---
 
@@ -1731,17 +1732,21 @@ Proxmox/PBS baseline backup          DONE
 
 ---
 
-# 47. Remaining Work
+# 47. Remaining Work / Future Improvements
 
-The following tasks are NOT yet complete:
+The local backup is already implemented, scheduled via systemd, validated, with 10-day retention and restore tested.
+Centralized monitoring via Zabbix is NOT a prerequisite for local backup completion and is classified as a future improvement / evolution, as there is currently no Zabbix server in production for this environment.
+
+Future improvements / evolutions:
 
 ```text
-Zabbix backup monitoring
+Backup monitoring via Zabbix (future evolution; no Zabbix server currently exists)
+Off-site backup
 OCI Object Storage repository
-Encrypted off-site backup
-OCI credential hardening
-OCI restore test
+Encrypted backup outside the local environment
+Restore from off-site / OCI
 Full disaster recovery test
+OCI credential hardening
 Regular Vaultwarden update procedure
 Regular restore verification procedure
 Formal maintenance runbook

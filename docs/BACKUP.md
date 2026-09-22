@@ -139,6 +139,15 @@ As definições estão versionadas no repositório em `backup/` e instaladas em 
   - O checksum SHA-256 do novo backup foi validado com sucesso.
   - O container Vaultwarden encerrou o ciclo em estado `running/healthy`.
 
+### 3.6. Monitoramento e Limitações Conhecidas
+
+- **Ausência de Servidor de Monitoramento:** Atualmente, **não** existe servidor Zabbix em produção para este ambiente. Por essa razão, nenhum template, script ou integração com Zabbix foi criada nesta etapa.
+- **Forma de Verificação Atual:** O acompanhamento operacional é realizado localmente através:
+  1. Dos logs do serviço systemd (`journalctl -u vaultwarden-backup.service`).
+  2. Do estado e agendamento do timer (`systemctl status vaultwarden-backup.timer` e `systemctl list-timers`).
+  3. Da validação dos arquivos e hashes gerados em `/var/backups/vaultwarden/`.
+- **Limitação Conhecida e Evolução:** A ausência de alertas ativos e centralizados em caso de falha é uma limitação conhecida do cenário atual. A implementação de monitoramento centralizado via Zabbix é classificada como uma melhoria futura / evolução e não é requisito para o funcionamento do backup local já concluído.
+
 ---
 
 ## 4. Comandos Reais de Validação
@@ -188,10 +197,11 @@ sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
 - [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático pós-validação de pares `.tar.gz` e `.sha256` testado com par fictício de 15 dias).
 - [x] Backup de baseline da VM no Proxmox VE / PBS validado com sucesso.
 
-### ⚠️ Itens Pendentes (Não documentar como implementados)
+### ⚠️ Melhorias Futuras / Evolução (Planejado)
 - [ ] **Observação de Disparo Automático Agendado:** Registro da primeira execução real noturna disparada automaticamente pelo timer às 03:00.
-- [ ] **Monitoramento via Zabbix:** Coleta e alertas do status de sucesso/falha da rotina de backup.
+- [ ] **Monitoramento via Zabbix:** Monitoramento centralizado e alertas de sucesso/falha do backup (não implementado nesta etapa, pois não existe servidor Zabbix no ambiente).
+- [ ] **Backup off-site:** Envio para armazenamento externo fora do ambiente local.
 - [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
-- [ ] **Backup off-site criptografado:** Configuração de repositório criptografado via Restic em nuvem.
-- [ ] **Teste de restore a partir do OCI:** Validação prática de recuperação direta do armazenamento em nuvem.
-- [ ] **Disaster recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Backup criptografado fora do ambiente local:** Configuração de repositório criptografado via Restic em nuvem.
+- [ ] **Restore a partir do off-site:** Validação prática de recuperação direta do armazenamento em nuvem (OCI).
+- [ ] **Disaster Recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.

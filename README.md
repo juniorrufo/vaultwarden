@@ -134,7 +134,7 @@ A aplicação opera sob controle estrito:
 ## 8. Estratégia de Backup
 
 O processo de proteção dos dados opera em camadas:
-1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) e inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup.
+1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) e inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup. A verificação operacional é realizada via logs do systemd e inspeção de arquivos; o monitoramento centralizado via Zabbix é classificado como melhoria futura.
 2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente temporário isolado, confirmando a recuperação dos cofres e das credenciais sem afetar a produção.
 3. **Backup da VM:** Snapshot de baseline da VM Debian validado via Proxmox Backup Server (PBS).
 
@@ -199,12 +199,13 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup, validado em teste com par fictício de 15 dias).
 - [x] Snapshot de baseline da VM validado via Proxmox Backup Server (PBS).
 
-### ⚠️ Pendente (Trabalhos Planejados Futuros)
-- [ ] **Monitoramento via Zabbix:** Configuração de monitoramento de sucesso/falha do timer de backup e métricas de integridade.
+### ⚠️ Melhorias Futuras / Evolução (Planejado)
+- [ ] **Monitoramento via Zabbix:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
+- [ ] **Backup off-site:** Envio para armazenamento externo fora do ambiente local.
 - [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
-- [ ] **Backup off-site criptografado:** Configuração de repositório criptografado via Restic em nuvem.
-- [ ] **Teste de restore a partir do OCI:** Validação prática de recuperação direta do armazenamento em nuvem.
-- [ ] **Disaster recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Backup criptografado fora do ambiente local:** Configuração de repositório criptografado via Restic em nuvem.
+- [ ] **Restore a partir do off-site:** Validação prática de recuperação direta do armazenamento em nuvem (OCI).
+- [ ] **Disaster Recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
 - [ ] **Hardening de Credenciais OCI:** Configuração de chaves de API com privilégios mínimos de escrita sem permissão de exclusão pública.
 - [ ] **Runbook Formal de Atualização e Testes Periódicos:** Formalização de cronograma de revisões periódicas.
 
