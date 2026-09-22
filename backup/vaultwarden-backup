@@ -9,6 +9,7 @@ CONTAINER="vaultwarden"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 ARCHIVE="${BACKUP_DIR}/vaultwarden_${TIMESTAMP}.tar.gz"
 CHECKSUM="${ARCHIVE}.sha256"
+RETENTION_DAYS=10
 
 LOCK_FILE="/run/lock/vaultwarden-backup.lock"
 
@@ -58,6 +59,21 @@ wait_healthy() {
 
     echo "Timeout aguardando Vaultwarden ficar healthy."
     return 1
+}
+
+prune_old_backups() {
+    local archive
+
+    while IFS= read -r -d '' archive; do
+        rm -f -- "${archive}" "${archive}.sha256"
+    done < <(
+        find "${BACKUP_DIR}" \
+            -maxdepth 1 \
+            -type f \
+            -name 'vaultwarden_*.tar.gz' \
+            -mmin "+$((RETENTION_DAYS * 24 * 60))" \
+            -print0
+    )
 }
 
 trap 'start_container || true; cleanup' EXIT
@@ -152,6 +168,9 @@ tar -tzf "${ARCHIVE}" >/dev/null
 
 # 13. Validar checksum
 sha256sum -c "${CHECKSUM}"
+
+# 14. Aplicar retenção somente após o backup atual estar validado
+prune_old_backups
 
 echo "Backup concluído:"
 echo "  ${ARCHIVE}"

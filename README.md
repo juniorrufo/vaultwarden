@@ -134,7 +134,7 @@ A aplicação opera sob controle estrito:
 ## 8. Estratégia de Backup
 
 O processo de proteção dos dados opera em camadas:
-1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true).
+1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) e inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup.
 2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente temporário isolado, confirmando a recuperação dos cofres e das credenciais sem afetar a produção.
 3. **Backup da VM:** Snapshot de baseline da VM Debian validado via Proxmox Backup Server (PBS).
 
@@ -193,19 +193,19 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - [x] Criação de conta de usuário, testes de login, logout e sincronização na extensão do navegador Bitwarden.
 - [x] Configuração e validação com sucesso do segundo fator de autenticação (TOTP) na conta administrativa e guarda offline dos códigos de recuperação.
 - [x] Bloqueio de novos cadastros (`SIGNUPS_ALLOWED=false`) e convites (`INVITATIONS_ALLOWED=false`).
-- [x] Criação e execução manual do script de backup `/usr/local/sbin/vaultwarden-backup`.
-- [x] Validação de integridade de arquivos TAR (`tar -tzf`) e hashes SHA-256 (`sha256sum -c`).
-- [x] Teste real de restauração de desastre executado com sucesso em ambiente temporário isolado.
-- [x] Automação de backup agendado via timer e serviço systemd (`vaultwarden-backup.service` Type=oneshot e `vaultwarden-backup.timer` diariamente às 03:00, Persistent=true) ativo e com execução manual validada (backup `vaultwarden_20260922_173509.tar.gz` gerado com sha256 íntegro e container healthy; próxima execução prevista para 23/09/2026 às 03:00).
+- [x] Backup diário via systemd (`vaultwarden-backup.service` Type=oneshot e `vaultwarden-backup.timer` diariamente às 03:00, Persistent=true) ativo e com execução manual validada (próxima execução prevista para 23/09/2026 às 03:00).
+- [x] Integridade SHA-256 (validação automatizada de integridade estrutural `tar -tzf` e hash `sha256sum -c`).
+- [x] Restore testado (validação funcional realizada em ambiente temporário isolado sem impacto na produção).
+- [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup, validado em teste com par fictício de 15 dias).
 - [x] Snapshot de baseline da VM validado via Proxmox Backup Server (PBS).
 
 ### ⚠️ Pendente (Trabalhos Planejados Futuros)
-- [ ] **Política de Retenção Local:** Implementação de expiração automatizada para retenção de 14 backups diários em `/var/backups/vaultwarden/`.
 - [ ] **Monitoramento via Zabbix:** Configuração de monitoramento de sucesso/falha do timer de backup e métricas de integridade.
-- [ ] **Backup Off-site em Nuvem (OCI):** Configuração de repositório criptografado via Restic em bucket privado no Oracle Cloud Infrastructure (OCI).
+- [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
+- [ ] **Backup off-site criptografado:** Configuração de repositório criptografado via Restic em nuvem.
+- [ ] **Teste de restore a partir do OCI:** Validação prática de recuperação direta do armazenamento em nuvem.
+- [ ] **Disaster recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
 - [ ] **Hardening de Credenciais OCI:** Configuração de chaves de API com privilégios mínimos de escrita sem permissão de exclusão pública.
-- [ ] **Teste de Restauração Off-site:** Execução de teste prático de restauração partindo diretamente do repositório da OCI.
-- [ ] **Simulação Completa de Disaster Recovery:** Teste ponta a ponta simulando perda total da VM e reconstrução em outro hypervisor.
 - [ ] **Runbook Formal de Atualização e Testes Periódicos:** Formalização de cronograma de revisões periódicas.
 
 ### 🔒 Informações que NUNCA Devem ir para o Git

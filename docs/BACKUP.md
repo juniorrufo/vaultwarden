@@ -68,7 +68,8 @@ O script opera com controle de concorrência (lock) e executa o seguinte fluxo:
     ```bash
     sha256sum -c vaultwarden_YYYYMMDD_HHMMSS.tar.gz.sha256
     ```
-14. **Conclusão:** Emite mensagem de conclusão bem-sucedida.
+14. **Aplicação da Retenção Local:** Executa `prune_old_backups` para remover arquivos `vaultwarden_*.tar.gz` e respectivos `.sha256` com mais de 10 dias (`RETENTION_DAYS=10`), somente após a criação e validação bem-sucedida do backup atual.
+15. **Conclusão:** Emite mensagem de conclusão bem-sucedida.
 
 ---
 
@@ -121,6 +122,23 @@ As definições estão versionadas no repositório em `backup/` e instaladas em 
 - [x] O agendamento da próxima execução foi registrado pelo systemd para 23/09/2026 às 03:00.
 - [ ] *Ressalva importante:* A execução automática no horário agendado (madrugada) ainda **não** foi observada em produção; portanto, não deve ser documentada como teste automático concluído.
 
+### 3.4. Política de Retenção Local
+
+- **Janela de Retenção:** 10 dias (`RETENTION_DAYS=10`).
+- **Comportamento Seguro:** A rotina de expurgo (`prune_old_backups`) só é executada estritamente após a conclusão e validação bem-sucedida do novo backup (`tar -tzf` e `sha256sum -c`) e confirmação do container em estado `healthy`.
+- **Escopo do Expurgo:** Remove arquivos `vaultwarden_*.tar.gz` criados há mais de 10 dias em `/var/backups/vaultwarden/` e apaga simultaneamente o respectivo arquivo de verificação `.sha256`.
+
+### 3.5. Teste Controlado de Retenção Validado
+
+- **Ambiente de Teste:** Para validar a lógica de exclusão sem colocar em risco os backups reais existentes, foi criado previamente em `/var/backups/vaultwarden/` um par de arquivos **FICTÍCIO** (`vaultwarden_*.tar.gz` e `.sha256`) com data de modificação simulada de 15 dias atrás, criado exclusivamente para validação.
+- **Execução Real:** O serviço `vaultwarden-backup.service` foi executado via `sudo systemctl start vaultwarden-backup.service`.
+- **Resultados Validados:**
+  - O par de arquivos fictício de 15 dias foi identificado e removido com sucesso.
+  - Todos os backups reais legítimos permaneceram intactos no diretório.
+  - O backup da própria execução foi gerado normalmente.
+  - O checksum SHA-256 do novo backup foi validado com sucesso.
+  - O container Vaultwarden encerrou o ciclo em estado `running/healthy`.
+
 ---
 
 ## 4. Comandos Reais de Validação
@@ -164,18 +182,16 @@ sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
 ## 5. O que foi EFETIVAMENTE TESTADO vs O que é PLANEJADO
 
 ### ✅ Estado Atual Testado e Validado em Produção
-- [x] Execução manual bem-sucedida do script `/usr/local/sbin/vaultwarden-backup`.
-- [x] Criação de arquivos `.tar.gz` consistentes com dados persistentes.
-- [x] Validação estrutural do arquivo via `tar -tzf`.
-- [x] Geração e verificação íntegra do hash via `sha256sum -c` (validado no arquivo `vaultwarden_20260922_173509.tar.gz`).
-- [x] Teste prático de restauração dos dados em ambiente temporário isolado (ver [`RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md)).
-- [x] Implementação de `vaultwarden-backup.service` e `vaultwarden-backup.timer` no systemd.
-- [x] Disparo manual do serviço systemd com término em container saudável e agendamento confirmado para o dia seguinte às 03:00.
+- [x] Backup diário via systemd (`vaultwarden-backup.service` e `vaultwarden-backup.timer`).
+- [x] Integridade SHA-256 (validação automatizada de integridade estrutural `tar -tzf` e hash `sha256sum -c`).
+- [x] Restore testado (validação funcional realizada em ambiente temporário isolado, ver [`RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md)).
+- [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático pós-validação de pares `.tar.gz` e `.sha256` testado com par fictício de 15 dias).
 - [x] Backup de baseline da VM no Proxmox VE / PBS validado com sucesso.
 
 ### ⚠️ Itens Pendentes (Não documentar como implementados)
-- [ ] **Observação de Disparo Automático Agendado:** Registro da primeira execução real noturna disparada automaticamente pelo timer.
-- [ ] **Política de Retenção Local:** Automação de descarte de backups antigos (meta: retenção de 14 dias diários).
+- [ ] **Observação de Disparo Automático Agendado:** Registro da primeira execução real noturna disparada automaticamente pelo timer às 03:00.
 - [ ] **Monitoramento via Zabbix:** Coleta e alertas do status de sucesso/falha da rotina de backup.
-- [ ] **Backup Off-site em Nuvem (OCI):** Criação de bucket privado no Oracle Cloud Infrastructure, configuração do Restic com encriptação client-side e chave dedicada com privilégios mínimos.
-- [ ] **Teste de Restore a partir da Nuvem:** Validação prática de recuperação direta do OCI Object Storage.
+- [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
+- [ ] **Backup off-site criptografado:** Configuração de repositório criptografado via Restic em nuvem.
+- [ ] **Teste de restore a partir do OCI:** Validação prática de recuperação direta do armazenamento em nuvem.
+- [ ] **Disaster recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.

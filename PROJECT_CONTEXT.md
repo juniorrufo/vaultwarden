@@ -1277,7 +1277,8 @@ The backup script performs approximately the following process:
 12. Start Vaultwarden.
 13. Wait for Vaultwarden to become healthy.
 14. Validate checksum.
-15. Report success.
+15. Prune old backups older than RETENTION_DAYS=10 and matching .sha256 files.
+16. Report success.
 ```
 
 The script uses a lock to prevent concurrent backups.
@@ -1341,32 +1342,27 @@ login test
 
 # 36. Local Backup Retention
 
-Current local backups are being stored in:
+Local backups are stored in:
 
 ```text
 /var/backups/vaultwarden
 ```
 
-Retention automation has NOT yet been finalized.
+### Retention Policy:
 
-Target policy:
+- Configured retention window: **10 days** (`RETENTION_DAYS=10`).
+- Pruning runs strictly **after** the new backup has been created and verified (`tar -tzf` and `sha256sum -c`).
+- It scans `/var/backups/vaultwarden` for archives older than 10 days (`vaultwarden_*.tar.gz`).
+- For each expired archive, both the archive file and its matching `.sha256` checksum file are removed.
 
-```text
-14 daily backups
-```
+### Controlled Validation Test:
 
-Future policy can be expanded to:
-
-```text
-daily
-weekly
-monthly
-```
-
-without changing the application architecture.
-
-Do not delete old backups until retention automation is implemented and
-tested.
+- A controlled test was performed by creating a **FICTITIOUS** backup pair (`vaultwarden_*.tar.gz` and `.sha256`) with a simulated age of 15 days, created exclusively for validation purposes.
+- A real execution of `vaultwarden-backup.service` was triggered via `systemctl start vaultwarden-backup.service`.
+- The script successfully created the new backup and validated its SHA-256 checksum.
+- The fictitious expired backup pair was successfully removed by `prune_old_backups`.
+- All genuine real backups remained intact.
+- Vaultwarden completed the execution in `running/healthy` state.
 
 ---
 
@@ -1729,6 +1725,7 @@ Backup script                        DONE
 Backup integrity test                DONE
 Backup restore test                  DONE
 Systemd backup timer                 DONE
+Backup retention automation          DONE
 Proxmox/PBS baseline backup          DONE
 ```
 
@@ -1739,7 +1736,6 @@ Proxmox/PBS baseline backup          DONE
 The following tasks are NOT yet complete:
 
 ```text
-Backup retention automation
 Zabbix backup monitoring
 OCI Object Storage repository
 Encrypted off-site backup

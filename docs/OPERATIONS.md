@@ -166,6 +166,19 @@ Caso seja necessário disparar o backup diretamente pelo shell:
 sudo /usr/local/sbin/vaultwarden-backup
 ```
 
+### 5.5. Auditoria da Retenção Local de Backups (10 Dias)
+O script de backup aplica automaticamente a política de retenção local (`RETENTION_DAYS=10`) ao final de cada execução bem-sucedida, somente após a validação do arquivo `.tar.gz` (`tar -tzf`), do checksum `.sha256` (`sha256sum -c`) e da confirmação de que o container permanece `running/healthy`.
+
+Para listar os backups locais armazenados e seus arquivos de integridade:
+```bash
+ls -lht /var/backups/vaultwarden/
+```
+
+Para inspecionar arquivos com mais de 10 dias (que serão expurgados na próxima execução bem-sucedida):
+```bash
+sudo find /var/backups/vaultwarden -maxdepth 1 -type f -name 'vaultwarden_*.tar.gz' -mmin +14400
+```
+
 ---
 
 ## 6. Matriz de Troubleshooting Ordenado
@@ -204,4 +217,4 @@ Para evitar diagnósticos incorretos, mantenha em mente que estas situações re
 | **Healthcheck "healthy" (/alive)** | Vaultwarden responde localmente | Rota pública Cloudflare ou túnel operando |
 | **Acesso Web Vault OK** | Serviço acessível publicamente | Backups estão sendo gerados ou são válidos |
 | **Arquivo .tar.gz gerado** | Script de backup foi executado | Dados são íntegros ou recuperáveis em caso de desastre |
-| **Restore Testado** | Recuperação de dados validada em teste prático | Automatização de retenção ou envio para nuvem |
+| **Restore Testado** | Recuperação de dados validada em teste prático | Envio para nuvem ou disaster recovery completo |
