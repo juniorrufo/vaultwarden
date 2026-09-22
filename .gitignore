@@ -1,0 +1,62 @@
+# Environment variables and deployment secrets
+.env
+.env.*
+!.env.example
+
+# SQLite databases, WAL and SHM journal files
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+db.sqlite3*
+
+# Backups and compressed archives
+/var/backups/
+backups/
+*.tar.gz
+*.tar
+*.gz
+*.zip
+*.7z
+*.sha256
+
+# Private keys, certificates and authentication tokens
+*.pem
+*.key
+rsa_key.pem
+*.crt
+*.cer
+cert.pem
+token
+*.token
+*.secret
+*.credentials
+
+# SSH private keys (allow public keys)
+id_rsa
+id_ecdsa
+id_ed25519
+!*.pub
+
+# Database dumps
+*.sql
+*.dump
+
+# Vaultwarden persistent data and Docker runtime artifacts
+data/
+icon_cache/
+attachments/
+sends/
+
+# Temporary, cache and editor files
+tmp/
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Windows / WSL alternate data streams
+*:Zone.Identifier
