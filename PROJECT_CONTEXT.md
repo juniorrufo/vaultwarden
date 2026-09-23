@@ -1412,8 +1412,8 @@ archive + SHA-256
 - The backup `vaultwarden_20260922_173509.tar.gz` was created successfully.
 - The corresponding `.sha256` checksum file was created and validated.
 - Vaultwarden finished the process in `running/healthy` state.
-- The next timer execution was shown by systemd for 03:00 of 2026-09-23.
-- Automatic execution at the scheduled time has NOT yet been observed, therefore it is not documented as a completed automatic test.
+- The daily 03:00 systemd backup execution was observed in real execution: backup file 'vaultwarden_20260923_030040.tar.gz'. Therefore, the daily systemd timer is effectively functioning in production.
+- Local retention remains 10 days (`RETENTION_DAYS=10`).
 
 Important:
 
@@ -1423,50 +1423,77 @@ The absence of proactive centralized alerting is a known limitation, and central
 
 ---
 
-# 38. Off-site Backup — Pending
+# 38. Off-site Backup — OCI (Implemented & Validated)
 
-Off-site backup is NOT yet finalized.
+Off-site backup to Oracle Cloud Infrastructure (OCI Object Storage) via Restic has been implemented and validated, including end-to-end restore validation in an isolated temporary environment.
 
-Target architecture:
+### Architecture:
 
 ```text
 Vaultwarden
     |
     v
-local backup archive
+local backup archive (/var/backups/vaultwarden) [10-day retention]
     |
     v
-Restic
+Restic (client-side encryption) [Manual execution]
     |
     v
-encrypted repository
-    |
-    v
-OCI Object Storage
+OCI Object Storage (private bucket)
 ```
 
-OCI will act as an independent off-site recovery location.
+### OCI Environment Configuration:
 
-The off-site backup must be encrypted before data leaves the local
-environment.
+- Region: `sa-saopaulo-1`
+- Namespace: `groqo9fbzuaz`
+- Compartment: `Backups`
+- Bucket: `vaultwarden-offsite` (strictly private, no public access)
+- API: S3-compatible API
+- Restic Repository ID: `7bbbe221`
+- Security & Secrets: OCI API credentials and Restic repository encryption key are stored securely on the host outside Git and are NEVER committed to the repository.
+
+### Restic Validation Lifecycle:
+
+1. **Repository Initialization:** Initialized successfully (`restic init`).
+2. **Initial Check:** `restic check` ran cleanly without errors.
+3. **Test Snapshot:** Test backup uploaded successfully.
+4. **Test Restore:** Test restore executed successfully and verified.
+5. **Prune Test:** Test snapshot purged with `restic forget --prune`.
+6. **Post-Prune Check:** `restic check` verified repository consistency with zero errors.
+
+### Real Production Backup Upload:
+
+- Real local backup archive created at: `/var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz`.
+- Uploaded to OCI via Restic (executed **MANUALLY**).
+- Real Restic snapshot created: `d5f61547`.
+- `restic check` after upload completed with: `no errors were found`.
+
+### Real Restore Validation from OCI:
+
+- Restore of snapshot `d5f61547` performed to an isolated temporary environment: `/tmp/restic-vaultwarden-restore`.
+- 17 files/directories successfully restored.
+- Restored file: `vaultwarden_20260923_181123.tar.gz`.
+- Restored SHA-256: `fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40`.
+- The restored SHA-256 strictly matched the stored `.sha256` checksum file.
+- The restored TAR archive contains `./db.sqlite3` and `./rsa_key.pem`.
+- The temporary restore directory `/tmp/restic-vaultwarden-restore` was completely removed after validation.
+- The production Vaultwarden instance was NOT replaced or altered during the restore test.
+
+### Important Operational Distinctions:
+
+- **Manual Upload:** The real upload to OCI was executed **manually**.
+- **Pending Automation:** Daily automation of the OCI upload (systemd timer/service) has NOT yet been implemented. Do not document OCI upload as automated.
+- **Pending Remote Retention:** Remote retention policy for the Restic repository (e.g., automated pruning of old snapshots) is NOT yet implemented.
 
 ---
 
-# 39. OCI Backup Requirements
+# 39. OCI Backup Requirements & Security Posture
 
-When OCI backup is implemented:
-
-- Use a dedicated Object Storage bucket.
-- Bucket must remain private.
-- Do not use public object access.
-- Use a dedicated credential with minimum required permissions.
-- Do not store OCI secrets in Git.
-- Do not place OCI API keys in the repository.
-- Do not place OCI secrets directly in documentation.
-- Use client-side encrypted backup storage.
-- Test restoring a backup directly from OCI.
-
-The OCI backup implementation is NOT yet complete.
+- Bucket `vaultwarden-offsite` remains strictly private without public object access.
+- Dedicated credential with minimum required permissions.
+- OCI secrets and Restic repository password are NEVER stored in Git or public docs.
+- Client-side encryption is enforced by Restic before any data leaves the host.
+- Restore from OCI was tested and validated in an isolated environment without affecting production.
 
 ---
 
@@ -1728,27 +1755,30 @@ Backup restore test                  DONE
 Systemd backup timer                 DONE
 Backup retention automation          DONE
 Proxmox/PBS baseline backup          DONE
+Restic repository OCI                DONE
+Upload real para OCI                 DONE
+restic check                         DONE
+Restore de backup real a partir do OCI DONE
+Validação do SHA-256 do backup recuperado DONE
 ```
 
 ---
 
 # 47. Remaining Work / Future Improvements
 
-The local backup is already implemented, scheduled via systemd, validated, with 10-day retention and restore tested.
-Centralized monitoring via Zabbix is NOT a prerequisite for local backup completion and is classified as a future improvement / evolution, as there is currently no Zabbix server in production for this environment.
+The local backup is fully implemented, scheduled via systemd, validated, with 10-day retention and restore tested.
+Off-site backup to OCI via Restic is initialized, verified, real backup uploaded manually, and real restore validated in an isolated temporary environment.
 
 Future improvements / evolutions:
 
 ```text
-Backup monitoring via Zabbix (future evolution; no Zabbix server currently exists)
-Off-site backup
-OCI Object Storage repository
-Encrypted backup outside the local environment
-Restore from off-site / OCI
-Full disaster recovery test
+Automação do upload off-site (timer/service systemd para envio diário ao OCI)
+Política de retenção do repositório Restic (forget --prune automatizado)
+Monitoramento centralizado (ex.: Zabbix; sem servidor Zabbix no ambiente atualmente)
+Teste completo de disaster recovery (reconstrução ponta a ponta em outro hypervisor)
+Verificação periódica de restore
 OCI credential hardening
 Regular Vaultwarden update procedure
-Regular restore verification procedure
 Formal maintenance runbook
 ```
 

@@ -134,9 +134,10 @@ A aplicação opera sob controle estrito:
 ## 8. Estratégia de Backup
 
 O processo de proteção dos dados opera em camadas:
-1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) e inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup. A verificação operacional é realizada via logs do systemd e inspeção de arquivos; o monitoramento centralizado via Zabbix é classificado como melhoria futura.
+1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) com execução noturna real já confirmada (`vaultwarden_20260923_030040.tar.gz`). Inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup. A verificação operacional é realizada via logs do systemd e inspeção de arquivos; o monitoramento centralizado via Zabbix é classificado como melhoria futura.
 2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente temporário isolado, confirmando a recuperação dos cofres e das credenciais sem afetar a produção.
 3. **Backup da VM:** Snapshot de baseline da VM Debian validado via Proxmox Backup Server (PBS).
+4. **Backup Off-site em Nuvem (OCI via Restic):** Repositório Restic inicializado com sucesso (ID `7bbbe221`) em bucket privado no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket `vaultwarden-offsite`, API compatível com S3) com criptografia client-side. O upload de um backup real (`vaultwarden_20260923_181123.tar.gz`, snapshot `d5f61547`) foi executado manualmente e validado com `restic check`. A recuperação foi homologada em ambiente temporário isolado (`/tmp/restic-vaultwarden-restore`), confirmando 17 itens restaurados, integridade do banco SQLite e chave RSA, e SHA-256 estritamente idêntico ao original, sem substituir ou alterar a produção. A automação diária do upload OCI e a política de retenção remota são melhorias futuras.
 
 Consulte [`docs/BACKUP.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/BACKUP.md) e [`docs/RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md) para detalhes operacionais.
 
@@ -193,19 +194,23 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - [x] Criação de conta de usuário, testes de login, logout e sincronização na extensão do navegador Bitwarden.
 - [x] Configuração e validação com sucesso do segundo fator de autenticação (TOTP) na conta administrativa e guarda offline dos códigos de recuperação.
 - [x] Bloqueio de novos cadastros (`SIGNUPS_ALLOWED=false`) e convites (`INVITATIONS_ALLOWED=false`).
-- [x] Backup diário via systemd (`vaultwarden-backup.service` Type=oneshot e `vaultwarden-backup.timer` diariamente às 03:00, Persistent=true) ativo e com execução manual validada (próxima execução prevista para 23/09/2026 às 03:00).
+- [x] Backup local diário via systemd (`vaultwarden-backup.service` Type=oneshot e `vaultwarden-backup.timer`, execução noturna observada em 23/09/2026 com `vaultwarden_20260923_030040.tar.gz`).
+- [x] Retenção local de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup, validado em teste com par fictício de 15 dias).
 - [x] Integridade SHA-256 (validação automatizada de integridade estrutural `tar -tzf` e hash `sha256sum -c`).
-- [x] Restore testado (validação funcional realizada em ambiente temporário isolado sem impacto na produção).
-- [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup, validado em teste com par fictício de 15 dias).
+- [x] Restore local testado (validação funcional realizada em ambiente temporário isolado sem impacto na produção).
 - [x] Snapshot de baseline da VM validado via Proxmox Backup Server (PBS).
+- [x] Restic repository OCI (inicializado com sucesso em bucket privado `vaultwarden-offsite`, ID `7bbbe221`).
+- [x] Upload real para OCI (backup real `vaultwarden_20260923_181123.tar.gz` enviado com snapshot `d5f61547`, executado manualmente).
+- [x] `restic check` (verificações inicial, pós-prune e pós-upload concluídas com `no errors were found`).
+- [x] Restore de backup real a partir do OCI (recuperação do snapshot `d5f61547` para `/tmp/restic-vaultwarden-restore` com 17 itens, sem substituir ou alterar a produção).
+- [x] Validação do SHA-256 do backup recuperado (`fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40` idêntico ao `.sha256` armazenado).
 
 ### ⚠️ Melhorias Futuras / Evolução (Planejado)
-- [ ] **Monitoramento via Zabbix:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
-- [ ] **Backup off-site:** Envio para armazenamento externo fora do ambiente local.
-- [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
-- [ ] **Backup criptografado fora do ambiente local:** Configuração de repositório criptografado via Restic em nuvem.
-- [ ] **Restore a partir do off-site:** Validação prática de recuperação direta do armazenamento em nuvem (OCI).
-- [ ] **Disaster Recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Automação do upload off-site:** Criação de timer e serviço systemd para envio diário automatizado ao repositório OCI.
+- [ ] **Política de retenção do repositório Restic:** Automação de expurgo (`restic forget --prune`) de snapshots antigos na nuvem.
+- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
+- [ ] **Teste completo de disaster recovery:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Verificação periódica de restore:** Formalização e execução de rotinas regulares de testes de recuperação.
 - [ ] **Hardening de Credenciais OCI:** Configuração de chaves de API com privilégios mínimos de escrita sem permissão de exclusão pública.
 - [ ] **Runbook Formal de Atualização e Testes Periódicos:** Formalização de cronograma de revisões periódicas.
 
@@ -216,7 +221,8 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - Banco de dados de produção `/opt/vaultwarden/data/db.sqlite3` e journals (`-wal`, `-shm`).
 - Arquivos de backup reais gerados (`/var/backups/vaultwarden/*.tar.gz`).
 - Tokens de autenticação do Cloudflare Tunnel (`/etc/cloudflared/token`).
-- Chaves de API, credenciais ou segredos de bucket do Oracle Cloud (OCI).
+- Chaves de API, credenciais ou segredos de bucket do Oracle Cloud (OCI) e credenciais de acesso S3.
+- Senha do repositório Restic (`RESTIC_PASSWORD` ou arquivos de chave/senha).
 - Códigos de recuperação do Vaultwarden, chaves mestras e segredos TOTP.
 
 ---

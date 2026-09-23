@@ -10,7 +10,7 @@ A proteção dos dados do Vaultwarden é composta por múltiplas camadas complem
 
 1. **Backup da Aplicação (Local):** Arquivamento consistente do banco SQLite e dos artefatos criptográficos persistentes em `/opt/vaultwarden/data`.
 2. **Backup da VM (Infraestrutura):** Snapshot completo do estado baseline da VM no Proxmox VE / PBS (*Proxmox Backup Server*).
-3. **Backup Off-site (Nuvem - Planejado):** Envio criptografado para OCI Object Storage via Restic.
+3. **Backup Off-site (Nuvem - OCI via Restic):** Envio criptografado client-side para bucket privado no Oracle Cloud Infrastructure via Restic, com integridade e restauração real validadas a partir da nuvem.
 
 ---
 
@@ -119,8 +119,7 @@ As definições estão versionadas no repositório em `backup/` e instaladas em 
 - [x] O arquivo de backup `vaultwarden_20260922_173509.tar.gz` foi criado com sucesso em `/var/backups/vaultwarden/`.
 - [x] O arquivo de checksum correspondente (`.sha256`) foi gerado e conferido com integridade.
 - [x] O container do Vaultwarden reiniciou e concluiu o ciclo em estado `running/healthy`.
-- [x] O agendamento da próxima execução foi registrado pelo systemd para 23/09/2026 às 03:00.
-- [ ] *Ressalva importante:* A execução automática no horário agendado (madrugada) ainda **não** foi observada em produção; portanto, não deve ser documentada como teste automático concluído.
+- [x] O agendamento diário e o disparo automático do timer no horário programado (03:00) foram observados e validados em regime real de produção na madrugada de 23/09/2026, com a criação bem-sucedida do backup `vaultwarden_20260923_030040.tar.gz`.
 
 ### 3.4. Política de Retenção Local
 
@@ -150,58 +149,125 @@ As definições estão versionadas no repositório em `backup/` e instaladas em 
 
 ---
 
-## 4. Comandos Reais de Validação
+## 4. Backup Off-site em Nuvem (OCI Object Storage via Restic)
 
-Para auditar os backups existentes e o estado do agendador:
+O backup off-site provê salvaguarda independente fora da infraestrutura física local, garantindo proteção contra desastres físicos, perda do Proxmox ou falha ampla no ambiente local.
 
-### 4.1. Listar Backups Existentes
+### 4.1. Configuração do Repositório OCI
+
+- **Região:** `sa-saopaulo-1`
+- **Namespace:** `groqo9fbzuaz`
+- **Compartment:** `Backups`
+- **Bucket:** `vaultwarden-offsite`
+- **Visibilidade:** Bucket estritamente privado (sem acesso público)
+- **Interface de Acesso:** API compatível com S3
+- **ID do Repositório Restic:** `7bbbe221`
+- **Criptografia Client-side:** Todos os dados são criptografados pelo Restic antes do envio pela rede, impedindo qualquer acesso não autorizado ao conteúdo do cofre em nuvem.
+- **Sigilo de Credenciais:** As credenciais OCI (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) e a senha mestra do repositório (`RESTIC_PASSWORD`) são mantidas estritamente isoladas na VM e **NUNCA** são expostas no Git.
+
+### 4.2. Ciclo de Validação do Restic
+
+O repositório foi homologado através do seguinte ciclo de testes:
+1. **Inicialização:** Repositório Restic inicializado com sucesso via `restic init`.
+2. **Checagem Inicial:** Executado `restic check` sem erros.
+3. **Upload de Teste:** Snapshot inicial de teste enviado com sucesso.
+4. **Restore de Teste:** Restauração do snapshot de teste executada e conteúdo validado.
+5. **Expurgo de Teste:** Snapshot temporário descartado e expurgado com `restic forget --prune`.
+6. **Checagem Pós-Expurgo:** Verificação de integridade via `restic check` concluída com zero erros.
+
+### 4.3. Upload Real de Produção
+
+- **Arquivo Local Utilizado:** `/var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz`.
+- **Modo de Execução:** O upload foi executado **MANUALMENTE**.
+- **Snapshot Restic Real:** `d5f61547`.
+- **Validação de Integridade Pós-Upload:** `restic check` concluído com:
+  ```text
+  no errors were found
+  ```
+
+### 4.4. Teste Real de Restauração a partir do OCI
+
+- **Ambiente de Teste:** Executado em diretório temporário isolado: `/tmp/restic-vaultwarden-restore`.
+- **Restauração:** Snapshot `d5f61547` restaurado a partir do OCI.
+- **Artefatos Recuperados:** 17 arquivos/diretórios restaurados com sucesso.
+- **Arquivo de Backup Recuperado:** `vaultwarden_20260923_181123.tar.gz`.
+- **Validação de Checksum SHA-256:**
+  - Hash calculado no arquivo restaurado: `fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40`.
+  - O hash coincidiu rigorosamente com o arquivo `.sha256` armazenado.
+- **Conteúdo Estrutural:** O arquivo TAR restaurado foi inspecionado, confirmando a integridade de `./db.sqlite3` e `./rsa_key.pem`.
+- **Limpeza e Isolamento:** O diretório temporário `/tmp/restic-vaultwarden-restore` foi removido imediatamente após a validação. A instância produtiva do Vaultwarden não foi substituída nem alterada durante o teste.
+
+### 4.5. Ressalvas Importantes sobre o Estado Atual
+- **Upload Manual:** O envio do backup ao OCI foi realizado manualmente via linha de comando.
+- **Automação Pendente:** A automação diária do envio para o OCI (serviço/timer systemd) ainda **NÃO** foi implementada.
+- **Retenção Remota Pendente:** A política de expurgo periódico de snapshots antigos no OCI ainda não foi automatizada.
+
+---
+
+## 5. Comandos Reais de Validação
+
+Para auditar os backups locais existentes, o agendador e o repositório OCI:
+
+### 5.1. Listar Backups Locais Existentes
 ```bash
 ls -lh /var/backups/vaultwarden/
 ```
 
-### 4.2. Validar Checksum SHA-256
+### 5.2. Validar Checksum SHA-256 Local
 ```bash
 cd /var/backups/vaultwarden/
-sha256sum -c vaultwarden_20260922_173509.tar.gz.sha256
+sha256sum -c vaultwarden_20260923_181123.tar.gz.sha256
 ```
-*Resultado esperado:* `vaultwarden_20260922_173509.tar.gz: OK`
+*Resultado esperado:* `vaultwarden_20260923_181123.tar.gz: OK`
 
-### 4.3. Inspecionar Conteúdo do TAR sem Extrair
+### 5.3. Inspecionar Conteúdo do TAR sem Extrair
 ```bash
-tar -tzvf /var/backups/vaultwarden/vaultwarden_20260922_173509.tar.gz
+tar -tzvf /var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz
 ```
 *Arquivos esperados no arquivo:*
 - `./db.sqlite3`
 - `./rsa_key.pem`
 - `./icon_cache/`
 
-### 4.4. Verificar Status do Timer e Próximo Disparo
+### 5.4. Verificar Status do Timer e Próximo Disparo
 ```bash
 sudo systemctl status vaultwarden-backup.timer
 sudo systemctl list-timers | grep vaultwarden
 ```
 
-### 4.5. Consultar Logs da Última Execução do Serviço
+### 5.5. Consultar Logs da Última Execução do Serviço
 ```bash
 sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
 ```
 
+### 5.6. Consultar Snapshots e Integridade no OCI (Restic)
+```bash
+# Listar snapshots no bucket OCI
+restic snapshots
+
+# Verificar integridade estrutural e criptográfica do repositório OCI
+restic check
+```
+
 ---
 
-## 5. O que foi EFETIVAMENTE TESTADO vs O que é PLANEJADO
+## 6. O que foi EFETIVAMENTE TESTADO vs O que é PLANEJADO
 
 ### ✅ Estado Atual Testado e Validado em Produção
-- [x] Backup diário via systemd (`vaultwarden-backup.service` e `vaultwarden-backup.timer`).
-- [x] Integridade SHA-256 (validação automatizada de integridade estrutural `tar -tzf` e hash `sha256sum -c`).
-- [x] Restore testado (validação funcional realizada em ambiente temporário isolado, ver [`RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md)).
-- [x] Retenção de 10 dias (`RETENTION_DAYS=10`, expurgo automático pós-validação de pares `.tar.gz` e `.sha256` testado com par fictício de 15 dias).
-- [x] Backup de baseline da VM no Proxmox VE / PBS validado com sucesso.
+- [x] Backup local diário via systemd (execução noturna observada em 23/09/2026 com `vaultwarden_20260923_030040.tar.gz`).
+- [x] Retenção local de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup).
+- [x] Integridade SHA-256 (validação via `sha256sum -c` e `tar -tzf`).
+- [x] Restore local (validação funcional em ambiente temporário isolado sem impacto na produção).
+- [x] Snapshot de baseline da VM no Proxmox VE / PBS validado com sucesso.
+- [x] Restic repository OCI (inicializado com sucesso em bucket privado `vaultwarden-offsite`, ID `7bbbe221`).
+- [x] Upload real para OCI (backup real `vaultwarden_20260923_181123.tar.gz` enviado com snapshot `d5f61547`, executado manualmente).
+- [x] `restic check` (verificações inicial, pós-prune e pós-upload concluídas com `no errors were found`).
+- [x] Restore de backup real a partir do OCI (recuperação do snapshot `d5f61547` para `/tmp/restic-vaultwarden-restore` com 17 itens, sem substituir ou alterar a produção).
+- [x] Validação do SHA-256 do backup recuperado (`fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40` idêntico ao `.sha256` armazenado).
 
 ### ⚠️ Melhorias Futuras / Evolução (Planejado)
-- [ ] **Observação de Disparo Automático Agendado:** Registro da primeira execução real noturna disparada automaticamente pelo timer às 03:00.
-- [ ] **Monitoramento via Zabbix:** Monitoramento centralizado e alertas de sucesso/falha do backup (não implementado nesta etapa, pois não existe servidor Zabbix no ambiente).
-- [ ] **Backup off-site:** Envio para armazenamento externo fora do ambiente local.
-- [ ] **OCI Object Storage:** Criação e configuração de bucket privado no Oracle Cloud Infrastructure.
-- [ ] **Backup criptografado fora do ambiente local:** Configuração de repositório criptografado via Restic em nuvem.
-- [ ] **Restore a partir do off-site:** Validação prática de recuperação direta do armazenamento em nuvem (OCI).
-- [ ] **Disaster Recovery completo:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Automação do upload off-site:** Criação de timer e serviço systemd para envio diário automatizado ao repositório OCI.
+- [ ] **Política de retenção do repositório Restic:** Automação de expurgo (`restic forget --prune`) de snapshots antigos na nuvem.
+- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
+- [ ] **Teste completo de disaster recovery:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
+- [ ] **Verificação periódica de restore:** Formalização e execução de cronograma de rotinas regulares de testes de recuperação.

@@ -145,3 +145,16 @@ Este documento registra formalmente as principais decisões arquiteturais tomada
   - Utilizar a tag `latest` com atualizadores automáticos como Watchtower (descartado expressamente para evitar quebras silenciosas em produção).
   - Utilizar apenas a tag de versão `1.37.3` (descartado porque tags de imagens podem ser republicadas no Docker Hub).
 - **Consequências:** Garantia absoluta de imutabilidade e reprodutibilidade do container; toda atualização passa por processo manual e documentado de homologação.
+
+---
+
+## DECISÃO: Backup off-site em nuvem via Restic e OCI Object Storage
+
+- **Contexto:** Necessidade de proteção contra cenários de desastre catastrófico físico (perda total da residência, queima física do host Proxmox ou corrupção generalizada do armazenamento local).
+- **Motivo:** Backups locais em `/var/backups/vaultwarden/` e snapshots no PBS residem sob o mesmo teto físico e compartilham riscos locais. A salvaguarda em nuvem precisa garantir total privacidade dos dados através de criptografia client-side ponta a ponta e independência de fornecedor, sem risco de expor credenciais em repositórios de código.
+- **Escolha:** Utilizar o **Restic** com backend S3 para o bucket privado `vaultwarden-offsite` no **Oracle Cloud Infrastructure (OCI Object Storage)** na região `sa-saopaulo-1` (compartment `Backups`, ID do repositório `7bbbe221`). O Restic encripta os dados localmente antes do envio, mantendo as chaves privadas e senha de acesso sob controle exclusivo do administrador fora do Git. O repositório foi inicializado, verificado, o backup real `vaultwarden_20260923_181123.tar.gz` (snapshot `d5f61547`) foi enviado manualmente e a recuperação foi homologada com sucesso em ambiente isolado (`/tmp/restic-vaultwarden-restore`), confirmando 17 arquivos restaurados e integridade SHA-256 perfeita.
+- **Alternativas consideradas:**
+  - Cópia remota simples via scp/rsync para VPS ou servidor de terceiros (descartado por manter complexidade de gestão de host adicional).
+  - AWS S3 / Google Cloud Storage (descartado em favor da infraestrutura OCI com bucket no compartment `Backups` e compatibilidade com API S3).
+  - Upload direto de arquivos `.tar.gz` sem ferramenta especializada de snapshots (descartado porque o Restic provê criptografia nativa no cliente, deduplicação em blocos e integridade verificável via `restic check`).
+- **Consequências:** Capacidade real e homologada de recuperação de desastres fora do ambiente local; garantia de privacidade por criptografia client-side; automação do envio diário via systemd e retenção do repositório remoto permanecem registradas como evoluções futuras.

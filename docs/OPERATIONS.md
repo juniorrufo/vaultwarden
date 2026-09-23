@@ -184,6 +184,23 @@ sudo find /var/backups/vaultwarden -maxdepth 1 -type f -name 'vaultwarden_*.tar.
 - **Forma de Verificação:** A validação do funcionamento dos backups é exclusivamente local, inspecionando os logs do serviço (`journalctl -u vaultwarden-backup.service`), o agendamento do timer (`systemctl list-timers`) e a integridade dos arquivos em `/var/backups/vaultwarden/`.
 - **Evolução Futura:** A ausência de alertas ativos remotos em caso de falha é uma limitação operacional conhecida; a integração com Zabbix é classificada como melhoria futura / evolução e não impacta o funcionamento do backup local implementado.
 
+### 5.7. Operação e Auditoria do Repositório OCI (Restic)
+O repositório em nuvem no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket privado `vaultwarden-offsite`, ID `7bbbe221`) utiliza criptografia client-side gerenciada pelo Restic.
+
+- **Listar Snapshots no OCI:**
+  ```bash
+  restic snapshots
+  ```
+- **Auditoria de Integridade Criptográfica do Repositório:**
+  ```bash
+  restic check
+  ```
+- **Restauração de Teste em Diretório Isolado:**
+  ```bash
+  restic restore <snapshot_id> --target /tmp/restic-vaultwarden-restore
+  ```
+- **Atenção Operacional:** O upload real para o OCI foi executado **manualmente** nesta etapa. A automação diária do envio e a política de retenção do repositório Restic (`forget --prune`) ainda não foram implementadas no systemd e permanecem como melhorias futuras. As credenciais OCI e senha do Restic residem exclusivamente no host e nunca devem ser versionadas no Git.
+
 ---
 
 ## 6. Matriz de Troubleshooting Ordenado
@@ -221,5 +238,6 @@ Para evitar diagnósticos incorretos, mantenha em mente que estas situações re
 | **Container "running"** | Processo do container não caiu | Aplicação respondendo a requisições |
 | **Healthcheck "healthy" (/alive)** | Vaultwarden responde localmente | Rota pública Cloudflare ou túnel operando |
 | **Acesso Web Vault OK** | Serviço acessível publicamente | Backups estão sendo gerados ou são válidos |
-| **Arquivo .tar.gz gerado** | Script de backup foi executado | Dados são íntegros ou recuperáveis em caso de desastre |
-| **Restore Testado** | Recuperação de dados validada em teste prático | Envio para nuvem ou disaster recovery completo |
+| **Arquivo .tar.gz gerado** | Script de backup local foi executado | Dados são íntegros ou recuperáveis em caso de desastre |
+| **Restore Local Testado** | Recuperação local validada em teste prático isolado | Envio para nuvem ou proteção contra desastres físicos |
+| **Restore a partir do OCI Testado** | Recuperação externa validada a partir da nuvem | Automação do envio diário OCI ou disaster recovery completo |
