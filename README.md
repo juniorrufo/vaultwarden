@@ -137,7 +137,7 @@ O processo de proteção dos dados opera em camadas:
 1. **Backup da Aplicação:** O script `/usr/local/sbin/vaultwarden-backup` invoca a rotina atômica embutida no binário (`docker exec vaultwarden /vaultwarden backup`), interrompe o container limparemte, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo arquivos WAL voláteis e temporários), gera hash SHA-256 e valida a integridade do arquivo. A rotina é automatizada via serviço systemd (`vaultwarden-backup.service`, Type=oneshot) acionado por timer diário (`vaultwarden-backup.timer`, diariamente às 03:00, Persistent=true) com execução noturna real já confirmada (`vaultwarden_20260923_030040.tar.gz`). Inclui política de retenção local de 10 dias (`RETENTION_DAYS=10`), que remove arquivos `.tar.gz` e `.sha256` antigos somente após a criação e validação bem-sucedida do novo backup. A verificação operacional é realizada via logs do systemd e inspeção de arquivos; o monitoramento centralizado via Zabbix é classificado como melhoria futura.
 2. **Restauração Testada:** A restauração dos dados foi executada e homologada em ambiente temporário isolado, confirmando a recuperação dos cofres e das credenciais sem afetar a produção.
 3. **Backup da VM:** Snapshot de baseline da VM Debian validado via Proxmox Backup Server (PBS).
-4. **Backup Off-site em Nuvem (OCI via Restic):** Repositório Restic inicializado com sucesso (ID `7bbbe221`) em bucket privado no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket `vaultwarden-offsite`, API compatível com S3) com criptografia client-side. O upload de um backup real (`vaultwarden_20260923_181123.tar.gz`, snapshot `d5f61547`) foi executado manualmente e validado com `restic check`. A recuperação foi homologada em ambiente temporário isolado (`/tmp/restic-vaultwarden-restore`), confirmando 17 itens restaurados, integridade do banco SQLite e chave RSA, e SHA-256 estritamente idêntico ao original, sem substituir ou alterar a produção. A automação diária do upload OCI e a política de retenção remota são melhorias futuras.
+4. **Backup Off-site Automatizado em Nuvem (OCI via Restic):** O script `/usr/local/sbin/vaultwarden-offsite-backup` é orquestrado pelo serviço systemd `vaultwarden-offsite-backup.service` (Type=oneshot, `Environment=HOME=/root`) e agendado pelo timer diário `vaultwarden-offsite-backup.timer` para as 03:30 (`Persistent=true`, 30 minutos após o backup local). O script verifica a existência de backup local recente em `/var/backups/vaultwarden`, valida o checksum SHA-256 antes da transmissão, envia os dados com criptografia client-side para o bucket privado `vaultwarden-offsite` no OCI (`sa-saopaulo-1`, API S3-compatible, ID `7bbbe221`), aplica retenção remota de 10 dias (`forget --keep-within 10d --prune`) e valida a integridade com `restic check`. A execução manual do serviço foi validada com sucesso; o disparo automático pelo timer às 03:30 aguarda observação noturna. A restauração a partir do OCI foi previamente homologada em ambiente isolado.
 
 Consulte [`docs/BACKUP.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/BACKUP.md) e [`docs/RESTORE.md`](file:///home/juniorrufo/projetos/vaultwarden/docs/RESTORE.md) para detalhes operacionais.
 
@@ -200,22 +200,24 @@ A tabela a seguir consolida os itens já concluídos em produção e os itens pl
 - [x] Restore local testado (validação funcional realizada em ambiente temporário isolado sem impacto na produção).
 - [x] Snapshot de baseline da VM validado via Proxmox Backup Server (PBS).
 - [x] Restic repository OCI (inicializado com sucesso em bucket privado `vaultwarden-offsite`, ID `7bbbe221`).
-- [x] Upload real para OCI (backup real `vaultwarden_20260923_181123.tar.gz` enviado com snapshot `d5f61547`, executado manualmente).
-- [x] `restic check` (verificações inicial, pós-prune e pós-upload concluídas com `no errors were found`).
+- [x] Upload real para OCI via Restic (`vaultwarden-offsite-backup` com validação prévia de integridade e checksum).
+- [x] `restic check` (verificações concluídas com `no errors were found`).
+- [x] Retenção remota de 10 dias no OCI (`restic forget --keep-within 10d --prune` executado e validado com sucesso).
+- [x] Automação off-site via systemd (`vaultwarden-offsite-backup.service` e `vaultwarden-offsite-backup.timer` diariamente às 03:30, execução manual do service validada com sucesso; cache corrigido com `Environment=HOME=/root`).
 - [x] Restore de backup real a partir do OCI (recuperação do snapshot `d5f61547` para `/tmp/restic-vaultwarden-restore` com 17 itens, sem substituir ou alterar a produção).
 - [x] Validação do SHA-256 do backup recuperado (`fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40` idêntico ao `.sha256` armazenado).
 
 ### ⚠️ Melhorias Futuras / Evolução (Planejado)
-- [ ] **Automação do upload off-site:** Criação de timer e serviço systemd para envio diário automatizado ao repositório OCI.
-- [ ] **Política de retenção do repositório Restic:** Automação de expurgo (`restic forget --prune`) de snapshots antigos na nuvem.
-- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
+- [ ] **Observação da execução automática do timer off-site:** Registro da primeira execução real noturna disparada automaticamente pelo timer às 03:30 (timer configurado e com execução manual validada).
+- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas dos timers de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
 - [ ] **Teste completo de disaster recovery:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
-- [ ] **Verificação periódica de restore:** Formalização e execução de rotinas regulares de testes de recuperação.
+- [ ] **Verificação periódica de restore:** Formalização e execução de cronograma de rotinas regulares de testes de recuperação.
 - [ ] **Hardening de Credenciais OCI:** Configuração de chaves de API com privilégios mínimos de escrita sem permissão de exclusão pública.
 - [ ] **Runbook Formal de Atualização e Testes Periódicos:** Formalização de cronograma de revisões periódicas.
 
 ### 🔒 Informações que NUNCA Devem ir para o Git
 - Arquivo `/opt/vaultwarden/.env` real contendo segredos de produção.
+- Arquivo de credenciais OCI `/etc/vaultwarden-backup/oci.env`.
 - Chaves privadas SSH (`id_ed25519`, `id_rsa`) e certificados com chaves privadas (`*.key`, `*.pem`).
 - Chave privada de aplicação `/opt/vaultwarden/data/rsa_key.pem`.
 - Banco de dados de produção `/opt/vaultwarden/data/db.sqlite3` e journals (`-wal`, `-shm`).

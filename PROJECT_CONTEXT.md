@@ -1,31 +1,31 @@
-# Vaultwarden Infrastructure — Project Context
+# Infraestrutura Vaultwarden — Contexto do Projeto
 
-## 1. Purpose
+## 1. Finalidade
 
-This repository documents and stores the reproducible configuration for a
-self-hosted Vaultwarden deployment running in a dedicated virtual machine
-inside a private home network.
+Este repositório documenta e armazena a configuração reproduzível para uma
+implantação auto-hospedada (self-hosted) do Vaultwarden em execução em uma
+máquina virtual dedicada dentro de uma rede doméstica privada.
 
-The primary goals are:
+Os objetivos principais são:
 
-- Secure self-hosted password management.
-- Minimal attack surface.
-- Reproducible infrastructure.
-- Documented operational procedures.
-- Reliable local and off-site backups.
-- Tested disaster recovery.
-- Explicit configuration instead of hidden/manual changes.
-- Ability to rebuild the environment from documentation + versioned configuration
-  + external backups.
+- Gerenciamento seguro de senhas auto-hospedado.
+- Superfície de ataque mínima.
+- Infraestrutura reproduzível.
+- Procedimentos operacionais documentados.
+- Backups locais e off-site confiáveis.
+- Restauração de desastres (disaster recovery) testada.
+- Configuração explícita em vez de alterações manuais/ocultas.
+- Capacidade de reconstruir o ambiente a partir da documentação + configuração
+  versionada + backups externos.
 
-This is a personal/family password manager deployment, not a large-scale
-multi-tenant service.
+Esta é uma implantação de gerenciador de senhas pessoal/familiar, e não um
+serviço multi-inquilino (multi-tenant) de grande escala.
 
 ---
 
-# 2. Current Architecture
+# 2. Arquitetura Atual
 
-## High-level topology
+## Topologia de alto nível
 
 ```text
                             INTERNET
@@ -36,29 +36,29 @@ multi-tenant service.
                        | DNS / TLS      |
                        +-------+--------+
                                |
-                               v
-                    Cloudflare Tunnel
+                                v
+                     Cloudflare Tunnel
                                |
-                               v
-                    192.168.15.253
-                     Cloudflared LXC
+                                v
+                     192.168.15.253
+                      Cloudflared LXC
                                |
-                         HTTP :8080
+                          HTTP :8080
                                |
-                               v
-                    192.168.15.200
-                     Vaultwarden VM
+                                v
+                     192.168.15.200
+                      Vaultwarden VM
                                |
                          Docker Engine
                                |
-                               v
+                                v
                      Vaultwarden :80
                                |
-                               v
-                           SQLite
+                                v
+                            SQLite
 ```
 
-## Virtualization
+## Virtualização
 
 Hypervisor:
 
@@ -66,13 +66,13 @@ Hypervisor:
 
 Guest:
 
-- Dedicated VM for Vaultwarden
+- VM dedicada para o Vaultwarden
 
-The Vaultwarden application is intentionally isolated in its own VM.
+A aplicação Vaultwarden é intencionalmente isolada em sua própria VM.
 
 ---
 
-# 3. VM Information
+# 3. Informações da VM
 
 Hostname:
 
@@ -80,25 +80,25 @@ Hostname:
 vaultwarden
 ```
 
-Operating System:
+Sistema Operacional:
 
 ```text
 Debian GNU/Linux 13 (trixie)
 ```
 
-Architecture:
+Arquitetura:
 
 ```text
 x86-64 / amd64
 ```
 
-Virtualization:
+Virtualização:
 
 ```text
 KVM
 ```
 
-Current kernel at deployment:
+Kernel atual no deployment:
 
 ```text
 Linux 6.12.107+deb13-amd64
@@ -110,19 +110,19 @@ CPU:
 2 vCPU
 ```
 
-Memory:
+Memória:
 
 ```text
 ~2 GB
 ```
 
-Disk:
+Disco:
 
 ```text
 ~32 GB
 ```
 
-Main network interface:
+Interface de rede principal:
 
 ```text
 ens18
@@ -134,20 +134,20 @@ IPv4:
 192.168.15.200/24
 ```
 
-Default gateway:
+Gateway padrão:
 
 ```text
 192.168.15.1
 ```
 
-IPv6 is enabled and functional.
+IPv6 está habilitado e funcional.
 
-The VM currently has a globally routable IPv6 address assigned by the
-network. IPv6 SSH access is intentionally blocked by the host firewall.
+A VM possui atualmente um endereço IPv6 globalmente roteável atribuído pela
+rede. O acesso SSH via IPv6 está intencionalmente bloqueado pelo firewall do host.
 
 ---
 
-# 4. Network Design
+# 4. Design de Rede
 
 LAN:
 
@@ -155,7 +155,7 @@ LAN:
 192.168.15.0/24
 ```
 
-Important hosts:
+Hosts importantes:
 
 ```text
 Vaultwarden VM:
@@ -168,12 +168,12 @@ Nginx Proxy Manager:
 192.168.15.251
 ```
 
-Nginx Proxy Manager exists elsewhere in the network but is NOT used by
+O Nginx Proxy Manager existe em outro local da rede, mas NÃO é utilizado pelo
 Vaultwarden.
 
-## Why NPM is not used
+## Por que o NPM não é utilizado
 
-The Vaultwarden deployment uses:
+O deployment do Vaultwarden utiliza:
 
 ```text
 Cloudflare
@@ -183,7 +183,7 @@ Cloudflare Tunnel
 Vaultwarden
 ```
 
-instead of:
+em vez de:
 
 ```text
 Cloudflare
@@ -195,75 +195,75 @@ NPM
 Vaultwarden
 ```
 
-Reasons:
+Motivos:
 
-- Avoid an unnecessary additional reverse-proxy dependency.
-- Reduce operational complexity.
-- Reduce attack surface.
-- Avoid making Vaultwarden dependent on NPM availability.
-- Cloudflare already provides the public HTTPS endpoint.
-- The Cloudflare Tunnel can directly forward requests to the Vaultwarden VM.
+- Evitar uma dependência adicional e desnecessária de proxy reverso.
+- Reduzir a complexidade operacional.
+- Reduzir a superfície de ataque.
+- Evitar tornar o Vaultwarden dependente da disponibilidade do NPM.
+- A Cloudflare já provê o endpoint HTTPS público.
+- O Cloudflare Tunnel pode encaminhar requisições diretamente para a VM do Vaultwarden.
 
-NPM remains available for other services in the network.
+O NPM permanece disponível para outros serviços na rede.
 
 ---
 
-# 5. Public URL
+# 5. URL Pública
 
-Production URL:
+URL de produção:
 
 ```text
 https://vault.rufonex.com.br
 ```
 
-The public HTTPS endpoint is handled by Cloudflare.
+O endpoint HTTPS público é gerenciado pela Cloudflare.
 
-Origin:
+Origem:
 
 ```text
 http://192.168.15.200:8080
 ```
 
-The Cloudflare Tunnel connects to the internal HTTP endpoint.
+O Cloudflare Tunnel conecta-se ao endpoint HTTP interno.
 
-There is intentionally no direct Internet port forwarding to the Vaultwarden
-VM.
+Intencionalmente, não há redirecionamento direto de portas da Internet para a
+VM do Vaultwarden.
 
 ---
 
 # 6. Cloudflare Tunnel
 
-The Cloudflare Tunnel runs in a dedicated LXC.
+O Cloudflare Tunnel roda em um LXC dedicado.
 
-Cloudflared host:
+Host do Cloudflared:
 
 ```text
 192.168.15.253
 ```
 
-The tunnel is managed remotely by Cloudflare.
+O túnel é gerenciado remotamente pela Cloudflare.
 
-Current local configuration model:
+Modelo atual de configuração local:
 
 ```text
 /etc/cloudflared/token
 ```
 
-No local `cert.pem` is required for the runtime configuration.
+Nenhum `cert.pem` local é necessário para a configuração em tempo de execução.
 
-There is currently no:
+Atualmente não existe:
 
 ```text
 /etc/cloudflared/config.yml
 ```
 
-Tunnel management is performed from the Cloudflare Dashboard.
+O gerenciamento do túnel é realizado a partir do Dashboard da Cloudflare.
 
-IMPORTANT:
+IMPORTANTE:
 
-Never commit the tunnel token or any Cloudflare secret to Git.
+Nunca comite o token do túnel ou qualquer segredo da Cloudflare no Git.
 
-The public route configured in Cloudflare is:
+A rota pública configurada na Cloudflare é:
 
 ```text
 vault.rufonex.com.br
@@ -273,32 +273,32 @@ http://192.168.15.200:8080
 
 ---
 
-# 7. Firewall Architecture
+# 7. Arquitetura de Firewall
 
-The host does NOT use a directly managed nftables ruleset.
+O host NÃO utiliza um conjunto de regras nftables gerenciado diretamente.
 
-Reason:
+Motivo:
 
-Docker integrates with iptables and expects the host firewall to cooperate
-with Docker's iptables chains.
+O Docker integra-se com o iptables e espera que o firewall do host coopere
+com as cadeias iptables do Docker.
 
-Current firewall implementation:
+Implementação atual do firewall:
 
 ```text
 iptables-nft
 ip6tables-nft
 ```
 
-Versions at deployment:
+Versões no deployment:
 
 ```text
 iptables v1.8.11 (nf_tables)
 ip6tables v1.8.11 (nf_tables)
 ```
 
-The Debian `nftables.service` was intentionally disabled and masked.
+O serviço Debian `nftables.service` foi intencionalmente desabilitado e mascarado.
 
-Current state:
+Estado atual:
 
 ```text
 nftables.service
@@ -306,17 +306,17 @@ nftables.service
     inactive
 ```
 
-Persistent firewall:
+Firewall persistente:
 
 ```text
 netfilter-persistent
 ```
 
-is enabled.
+está habilitado.
 
 ---
 
-# 8. Base Host Firewall Policy
+# 8. Política de Firewall Base do Host
 
 IPv4:
 
@@ -340,25 +340,25 @@ IPv4 SSH:
 192.168.15.0/24 -> TCP/22 -> ALLOW
 ```
 
-SSH from IPv6 is intentionally not allowed.
+SSH a partir de IPv6 é intencionalmente não permitido.
 
-Allowed basic traffic includes:
+Tráfego básico permitido inclui:
 
 - loopback
-- established/related connections
-- IPv4 ICMP
-- required IPv6 ICMPv6 functionality
-- SSH from the management LAN
+- conexões estabelecidas/relacionadas (established/related)
+- ICMP IPv4
+- funcionalidade ICMPv6 necessária
+- SSH a partir da LAN de gerenciamento
 
-The firewall configuration survives VM reboots.
+A configuração do firewall sobrevive a reinicializações da VM.
 
-A reboot test was performed successfully.
+Um teste de reboot foi realizado com sucesso.
 
 ---
 
-# 9. Docker Firewall Policy
+# 9. Política de Firewall do Docker
 
-Docker creates its standard chains including:
+O Docker cria suas cadeias padrão, incluindo:
 
 ```text
 DOCKER
@@ -369,7 +369,7 @@ DOCKER-INTERNAL
 DOCKER-USER
 ```
 
-The administrative firewall policy is implemented through:
+A política administrativa de firewall é implementada através de:
 
 ```text
 DOCKER-USER
@@ -378,34 +378,34 @@ DOCKER-USER
 VW-DOCKER
 ```
 
-The dedicated chain is:
+A cadeia dedicada é:
 
 ```text
 VW-DOCKER
 ```
 
-Current policy:
+Política atual:
 
 ```text
 ESTABLISHED,RELATED
     -> ACCEPT
 
 192.168.15.253
-    + original destination 192.168.15.200:8080
+    + destino original 192.168.15.200:8080
     -> ACCEPT
 
-other sources
-    + original destination 192.168.15.200:8080
+outras origens
+    + destino original 192.168.15.200:8080
     -> DROP
 
-everything else
+todo o resto
     -> RETURN
 ```
 
-Filtering uses conntrack original-destination matching because Docker performs
-DNAT before traffic reaches the administrative filtering point.
+A filtragem utiliza correspondência de destino original via conntrack porque o Docker executa
+DNAT antes que o tráfego alcance o ponto de filtragem administrativo.
 
-The effective rule set is:
+O conjunto efetivo de regras é:
 
 ```text
 -A DOCKER-USER -j VW-DOCKER
@@ -429,7 +429,7 @@ The effective rule set is:
 -A VW-DOCKER -j RETURN
 ```
 
-This means:
+Isso significa:
 
 ```text
 Cloudflared LXC
@@ -444,69 +444,69 @@ Vaultwarden
 ALLOW
 ```
 
-while other hosts cannot directly access the published Vaultwarden port.
+enquanto outros hosts não conseguem acessar diretamente a porta publicada do Vaultwarden.
 
-This was tested successfully.
+Isso foi testado com sucesso.
 
-Test from Cloudflared:
+Teste a partir do Cloudflared:
 
 ```text
 curl http://192.168.15.200:8080/alive
 ```
 
-Result:
+Resultado:
 
 ```text
 HTTP 200
 ```
 
-Test from another LAN origin:
+Teste a partir de outra origem na LAN:
 
 ```text
 curl http://192.168.15.200:8080/alive
 ```
 
-Result:
+Resultado:
 
 ```text
 connection timeout
 ```
 
-The firewall policy is implemented by:
+A política de firewall é implementada por:
 
 ```text
 /usr/local/sbin/vaultwarden-docker-firewall
 ```
 
-and:
+e:
 
 ```text
 /etc/systemd/system/vaultwarden-docker-firewall.service
 ```
 
-The systemd service is enabled and reapplies the Docker-specific policy after
-Docker becomes available.
+O serviço systemd está habilitado e reaplica a política específica do Docker após
+o Docker ficar disponível.
 
-The policy was tested after:
+A política foi testada após:
 
-- Docker restart
-- full VM reboot
+- reinicialização do Docker
+- reboot completo da VM
 
-and remained functional.
+e permaneceu funcional.
 
 ---
 
-# 10. SSH Hardening
+# 10. Hardening de SSH
 
-Administrative user:
+Usuário administrativo:
 
 ```text
 junior
 ```
 
-SSH authentication is public-key only.
+A autenticação SSH é exclusivamente por chave pública.
 
-Current effective SSH configuration:
+Configuração SSH efetiva atual:
 
 ```text
 UsePAM yes
@@ -518,46 +518,46 @@ KbdInteractiveAuthentication no
 AllowUsers junior
 ```
 
-SSH configuration was validated with:
+A configuração SSH foi validada com:
 
 ```bash
 sudo sshd -t
 ```
 
-and the effective configuration was inspected with:
+e a configuração efetiva foi inspecionada com:
 
 ```bash
 sudo sshd -T
 ```
 
-Two public keys are authorized for the `junior` account:
+Duas chaves públicas estão autorizadas para a conta `junior`:
 
 ```text
-WSL key
-Windows PowerShell key
+chave WSL
+chave Windows PowerShell
 ```
 
-Private keys MUST NOT be stored in Git.
+Chaves privadas NÃO DEVEM ser armazenadas no Git.
 
-The existing private keys are backed up separately in a secure offline location.
+As chaves privadas existentes possuem backup separado em um local seguro e offline.
 
 ---
 
-# 11. SSH Access
+# 11. Acesso SSH
 
-Management normally happens from:
+O gerenciamento ocorre normalmente a partir de:
 
 ```text
 WSL
 ```
 
-and:
+e:
 
 ```text
 Windows PowerShell
 ```
 
-Example:
+Exemplo:
 
 ```bash
 ssh -o IdentitiesOnly=yes \
@@ -565,42 +565,42 @@ ssh -o IdentitiesOnly=yes \
     junior@192.168.15.200
 ```
 
-PowerShell equivalent uses the Windows private key.
+O equivalente em PowerShell utiliza a chave privada do Windows.
 
 ---
 
 # 12. Proxmox QEMU Guest Agent
 
-QEMU Guest Agent is installed and operational.
+O QEMU Guest Agent está instalado e operacional.
 
-Guest communication channel:
+Canal de comunicação do guest:
 
 ```text
 /dev/virtio-ports/org.qemu.guest_agent.0
 ```
 
-The service is:
+O serviço é:
 
 ```text
 qemu-guest-agent.service
 ```
 
-and is intentionally installed as a static systemd service according to the
-Debian packaging model.
+e está intencionalmente instalado como um serviço systemd estático de acordo com o
+modelo de empacotamento do Debian.
 
-Verified status:
+Status verificado:
 
 ```text
 active (running)
 ```
 
-The Proxmox VM has QEMU Guest Agent enabled.
+A VM no Proxmox possui o QEMU Guest Agent habilitado.
 
 ---
 
-# 13. Time Synchronization
+# 13. Sincronização de Horário (Time Synchronization)
 
-Timezone:
+Fuso horário:
 
 ```text
 America/Sao_Paulo
@@ -612,29 +612,29 @@ NTP:
 enabled
 ```
 
-System clock:
+Relógio do sistema:
 
 ```text
 synchronized
 ```
 
-The VM uses network time synchronization.
+A VM utiliza sincronização de horário via rede.
 
-Correct time is important for:
+O horário correto é essencial para:
 
 - TOTP
 - TLS
 - logs
-- token validation
-- scheduled backups
+- validação de tokens
+- backups agendados
 
 ---
 
-# 14. Docker Installation
+# 14. Instalação do Docker
 
-Docker was installed from the official Docker Debian repository.
+O Docker foi instalado a partir do repositório oficial do Docker para Debian.
 
-Current components at deployment:
+Componentes atuais no deployment:
 
 ```text
 Docker Engine: 29.8.1
@@ -644,7 +644,7 @@ runc: 1.5.1
 Buildx: 0.37.1
 ```
 
-Docker uses:
+O Docker utiliza:
 
 ```text
 Storage Driver:
@@ -660,13 +660,13 @@ Firewall Backend:
 iptables
 ```
 
-Docker root directory:
+Diretório raiz do Docker:
 
 ```text
 /var/lib/docker
 ```
 
-Docker service:
+Serviço do Docker:
 
 ```text
 enabled
@@ -675,15 +675,15 @@ active
 
 ---
 
-# 15. Docker Daemon Configuration
+# 15. Configuração do Daemon do Docker
 
-File:
+Arquivo:
 
 ```text
 /etc/docker/daemon.json
 ```
 
-Current configuration:
+Configuração atual:
 
 ```json
 {
@@ -696,14 +696,14 @@ Current configuration:
 }
 ```
 
-Purpose:
+Finalidade:
 
-- use controlled local Docker logging
-- prevent unbounded container log growth
-- retain a limited number of log files
-- keep supported containers running during certain Docker daemon restarts
+- utilizar logging local controlado no Docker
+- prevenir crescimento ilimitado dos logs dos containers
+- reter um número limitado de arquivos de log
+- manter containers suportados em execução durante certos reinícios do daemon do Docker
 
-Docker configuration was validated using:
+A configuração do Docker foi validada utilizando:
 
 ```bash
 dockerd --validate --config-file=/etc/docker/daemon.json
@@ -711,35 +711,34 @@ dockerd --validate --config-file=/etc/docker/daemon.json
 
 ---
 
-# 16. Docker Privilege Model
+# 16. Modelo de Privilégios do Docker
 
-The administrative Linux user `junior` is NOT a member of the `docker` group.
+O usuário Linux administrativo `junior` NÃO é membro do grupo `docker`.
 
-Docker commands are intentionally executed with:
+Comandos do Docker são intencionalmente executados com:
 
 ```bash
 sudo docker ...
 ```
 
-Reason:
+Motivo:
 
-Membership in the Docker group effectively grants high privileges over the
-Docker daemon and therefore over the host.
+Ser membro do grupo Docker efetivamente concede altos privilégios sobre o
+daemon do Docker e, portanto, sobre o host.
 
-Do not add the user to the Docker group without a specific architectural
-reason.
+Não adicione o usuário ao grupo Docker sem um motivo arquitetural específico.
 
 ---
 
-# 17. Vaultwarden Container
+# 17. Container do Vaultwarden
 
-Application:
+Aplicação:
 
 ```text
 Vaultwarden
 ```
 
-Current server version:
+Versão atual do servidor:
 
 ```text
 1.37.3
@@ -751,43 +750,43 @@ Container:
 vaultwarden
 ```
 
-Image is pinned by digest.
+A imagem é fixada por digest imutável.
 
-Current image digest:
+Digest atual da imagem:
 
 ```text
 sha256:4ecafc9049c7d878c7717d1ce4f9059d706758c78b8fa42e5ead21f4b2dfc770
 ```
 
-Platform:
+Plataforma:
 
 ```text
 linux/amd64
 ```
 
-Do not replace the image reference with:
+Não substitua a referência da imagem por:
 
 ```text
 latest
 ```
 
-without a deliberate upgrade process.
+sem um processo de atualização planejado.
 
-Image upgrades must be intentional and documented.
+Atualizações de imagem devem ser intencionais e documentadas.
 
 ---
 
-# 18. Vaultwarden Docker Compose
+# 18. Docker Compose do Vaultwarden
 
-Current Compose file:
+Arquivo Compose atual:
 
 ```text
 /opt/vaultwarden/docker-compose.yaml
 ```
 
-The deployment intentionally uses a single application container.
+O deployment utiliza intencionalmente um único container de aplicação.
 
-There is NO:
+NÃO há:
 
 - PostgreSQL
 - Redis
@@ -795,29 +794,29 @@ There is NO:
 - Nginx Proxy Manager
 - Portainer
 - Watchtower
-- separate Cloudflared container
+- container separado de Cloudflared
 
-The architecture intentionally avoids unnecessary components.
+A arquitetura intencionalmente evita componentes desnecessários.
 
 ---
 
-# 19. Vaultwarden Docker Network
+# 19. Rede Docker do Vaultwarden
 
-Compose creates:
+O Compose cria:
 
 ```text
 vaultwarden_net
 ```
 
-Network type:
+Tipo de rede:
 
 ```text
 bridge
 ```
 
-The network is declared in Compose rather than created manually.
+A rede é declarada no Compose em vez de criada manualmente.
 
-Current design:
+Design atual:
 
 ```text
 vaultwarden_net
@@ -825,71 +824,71 @@ vaultwarden_net
     +-- vaultwarden
 ```
 
-This keeps the Compose deployment reproducible.
+Isso mantém o deployment via Compose reproduzível.
 
 ---
 
-# 20. Vaultwarden Port Publishing
+# 20. Publicação de Portas do Vaultwarden
 
-Current production binding:
+Binding de produção atual:
 
 ```text
 192.168.15.200:8080 -> container:80
 ```
 
-The service is NOT published on:
+O serviço NÃO é publicado em:
 
 ```text
 0.0.0.0:8080
 ```
 
-The Docker firewall policy restricts access to this published port so that only
-the Cloudflare Tunnel LXC can reach it.
+A política de firewall do Docker restringe o acesso a essa porta publicada de modo que apenas
+o LXC do Cloudflare Tunnel consiga alcançá-la.
 
 ---
 
-# 21. Vaultwarden Container Security Settings
+# 21. Configurações de Segurança do Container Vaultwarden
 
-Current container configuration includes:
+A configuração atual do container inclui:
 
 ```yaml
 restart: unless-stopped
 ```
 
-and:
+e:
 
 ```yaml
 security_opt:
   - no-new-privileges:true
 ```
 
-The container has:
+O container possui:
 
 ```yaml
 stop_grace_period: 30s
 ```
 
-The image-provided healthcheck is used instead of a custom healthcheck.
+O healthcheck fornecido pela imagem é utilizado em vez de um healthcheck personalizado.
 
-Current health state has been verified as:
+O estado atual de saúde foi verificado como:
 
 ```text
 healthy
 ```
 
-The application health endpoint is:
+O endpoint de saúde da aplicação é:
 
 ```text
 /alive
 ```
 
-Example:
+Exemplo:
 
 ```bash
 curl http://192.168.15.200:8080/alive
 ```
 
-Expected successful response:
+Resposta esperada de sucesso:
 
 ```text
 HTTP 200
@@ -897,21 +896,21 @@ HTTP 200
 
 ---
 
-# 22. Vaultwarden Persistent Data
+# 22. Dados Persistentes do Vaultwarden
 
-Host directory:
+Diretório no host:
 
 ```text
 /opt/vaultwarden/data
 ```
 
-Container mount:
+Montagem no container:
 
 ```text
 /opt/vaultwarden/data:/data
 ```
 
-The persistent data directory currently contains items such as:
+O diretório de dados persistentes contém atualmente itens como:
 
 ```text
 db.sqlite3
@@ -920,153 +919,152 @@ icon_cache/
 tmp/
 ```
 
-Additional directories/files may appear as Vaultwarden features are used.
+Diretórios/arquivos adicionais podem surgir conforme funcionalidades do Vaultwarden forem utilizadas.
 
-The `/data` directory is critical to disaster recovery.
+O diretório `/data` é crítico para a recuperação de desastres.
 
-Do not delete or recreate it without understanding the recovery impact.
+Não o exclua nem o recrie sem compreender o impacto na recuperação.
 
 ---
 
-# 23. Database
+# 23. Banco de Dados
 
-Database engine:
+Engine de banco de dados:
 
 ```text
 SQLite
 ```
 
-Primary database:
+Banco de dados primário:
 
 ```text
 /opt/vaultwarden/data/db.sqlite3
 ```
 
-Reason for SQLite:
+Motivo da escolha do SQLite:
 
-- personal deployment
-- low operational complexity
-- low resource consumption
-- easy recovery
-- no additional database service
-- appropriate for current workload
+- deployment pessoal
+- baixa complexidade operacional
+- baixo consumo de recursos
+- fácil recuperação
+- nenhum serviço de banco de dados adicional
+- adequado para a carga de trabalho atual
 
-Do NOT introduce PostgreSQL solely for the sake of making the
-architecture appear more "professional".
+NÃO introduza o PostgreSQL apenas com o objetivo de fazer a arquitetura parecer mais "profissional".
 
-The current architecture intentionally values reduced operational complexity.
+A arquitetura atual valoriza intencionalmente a redução da complexidade operacional.
 
 ---
 
-# 24. Vaultwarden Account
+# 24. Conta do Vaultwarden
 
-The primary user account was created successfully.
+A conta de usuário primária foi criada com sucesso.
 
-The following operations were tested:
+As seguintes operações foram testadas:
 
 ```text
-create account
+criar conta
     ->
 login
     ->
 logout
     ->
-login again
+login novamente
 ```
 
-The Web Vault works through:
+O Web Vault funciona através de:
 
 ```text
 https://vault.rufonex.com.br
 ```
 
-The official Bitwarden browser extension was also configured to use the
-self-hosted environment rather than Bitwarden Cloud.
+A extensão oficial do navegador Bitwarden também foi configurada para utilizar o
+ambiente auto-hospedado em vez da nuvem do Bitwarden (Bitwarden Cloud).
 
-The browser extension was tested successfully.
+A extensão do navegador foi testada com sucesso.
 
 ---
 
-# 25. Self-hosted Bitwarden Client Configuration
+# 25. Configuração do Cliente Bitwarden Auto-hospedado
 
-The browser extension must point to:
+A extensão do navegador deve apontar para:
 
 ```text
 https://vault.rufonex.com.br
 ```
 
-Environment:
+Ambiente:
 
 ```text
-Self-hosted
+Self-hosted (Auto-hospedado)
 ```
 
-It must NOT remain pointed at:
+NÃO deve permanecer apontada para:
 
 ```text
 bitwarden.com
 ```
 
-If the extension reports that the master password is invalid while the Web
-Vault works, first verify the selected server environment.
+Se a extensão relatar que a senha mestre é inválida enquanto o Web
+Vault funciona normalmente, verifique primeiro o ambiente de servidor selecionado.
 
 ---
 
-# 26. Two-Factor Authentication
+# 26. Autenticação de Dois Fatores (2FA)
 
-Current second factor:
+Segundo fator atual:
 
 ```text
 TOTP
 ```
 
-TOTP was configured and successfully tested.
+O TOTP foi configurado e testado com sucesso na conta administrativa.
 
-The recovery code is stored outside Vaultwarden.
+O código de recuperação está armazenado fora do Vaultwarden.
 
-The recovery code MUST NOT be:
+O código de recuperação NÃO DEVE ser:
 
-- committed to Git
-- stored in the Vaultwarden vault itself
-- placed in the Docker `.env`
-- stored in a public/shared location
+- comitado no Git
+- armazenado no próprio cofre do Vaultwarden
+- inserido no `.env` do Docker
+- armazenado em local público/compartilhado
 
-The current deployment intentionally uses TOTP only.
+O deployment atual utiliza intencionalmente apenas TOTP.
 
-WebAuthn is not required unless intentionally added later.
+WebAuthn não é obrigatório, a menos que seja intencionalmente adicionado no futuro.
 
 ---
 
-# 27. Vaultwarden Registration Policy
+# 27. Política de Registro do Vaultwarden
 
-Current policy:
+Política atual:
 
 ```text
 SIGNUPS_ALLOWED=false
 INVITATIONS_ALLOWED=false
 ```
 
-The first account was created during the initial bootstrap while signup was
-temporarily enabled.
+A primeira conta foi criada durante o bootstrap inicial enquanto o cadastro estava
+temporariamente habilitado.
 
-After account creation, signup was disabled.
+Após a criação da conta, o cadastro foi desabilitado.
 
-This prevents arbitrary users from registering on the public endpoint.
+Isso impede que usuários não autorizados se registrem no endpoint público.
 
 ---
 
-# 28. Vaultwarden Environment
+# 28. Ambiente do Vaultwarden (Environment)
 
-Current environment file:
+Arquivo de ambiente atual:
 
 ```text
 /opt/vaultwarden/.env
 ```
 
-This file is protected and is NOT intended to be committed if it contains
-deployment secrets or environment-specific sensitive values.
+Este arquivo é protegido e NÃO deve ser comitado se contiver
+segredos de implantação ou valores sensíveis específicos do ambiente.
 
-At minimum, it contains configuration related to:
+No mínimo, contém configurações relacionadas a:
 
 ```text
 DOMAIN
@@ -1074,53 +1072,53 @@ SIGNUPS_ALLOWED
 BIND_ADDRESS
 ```
 
-The production domain is:
+O domínio de produção é:
 
 ```text
 https://vault.rufonex.com.br
 ```
 
-The environment file must be reviewed carefully before being added to Git.
+O arquivo de ambiente deve ser revisado cuidadosamente antes de ser adicionado ao Git.
 
-Use an example file such as:
+Utilize um arquivo de exemplo como:
 
 ```text
 .env.example
 ```
 
-for version control.
+para controle de versão.
 
 ---
 
-# 29. Backup Strategy
+# 29. Estratégia de Backup
 
-Current backup architecture:
+Arquitetura de backup atual:
 
 ```text
 Vaultwarden
     |
-    +--> native SQLite backup
+    +--> backup nativo do SQLite
     |
-    +--> complete /data archive
+    +--> arquivo completo de /data
     |
-    +--> SHA-256 checksum
+    +--> checksum SHA-256
     |
-    +--> local backup storage
+    +--> armazenamento local de backup
 ```
 
-Current local backup directory:
+Diretório de backup local atual:
 
 ```text
 /var/backups/vaultwarden
 ```
 
-Temporary staging directory:
+Diretório temporário de preparação (staging):
 
 ```text
 /var/lib/vaultwarden-backup
 ```
 
-Backup script:
+Script de backup:
 
 ```text
 /usr/local/sbin/vaultwarden-backup
@@ -1128,33 +1126,33 @@ Backup script:
 
 ---
 
-# 30. Native Vaultwarden SQLite Backup
+# 30. Backup Nativo do SQLite no Vaultwarden
 
-The Vaultwarden binary provides a native backup command:
+O binário do Vaultwarden fornece um comando nativo de backup:
 
 ```bash
 docker exec vaultwarden /vaultwarden backup
 ```
 
-This produces a timestamped SQLite backup inside `/data`.
+Isso gera um backup SQLite com timestamp dentro de `/data`.
 
-Example:
+Exemplo:
 
 ```text
 db_20260922_180023.sqlite3
 ```
 
-The native backup mechanism is preferred over blindly copying the live SQLite
-database while it is being modified.
+O mecanismo de backup nativo é preferível em vez de copiar cegamente o
+banco SQLite em execução enquanto ele está sendo modificado.
 
 ---
 
-# 31. Complete Backup Archive
+# 31. Arquivo de Backup Completo
 
-The backup script creates a complete archive containing the important
-persistent Vaultwarden state.
+O script de backup cria um arquivo compactado completo contendo o estado
+persistente importante do Vaultwarden.
 
-The archive currently preserves:
+O arquivo atualmente preserva:
 
 ```text
 db.sqlite3
@@ -1162,10 +1160,10 @@ rsa_key.pem
 icon_cache/
 ```
 
-and will also preserve additional persistent files/directories that may appear
-in `/data` in the future, subject to the script's exclusion rules.
+e também preservará arquivos/diretórios persistentes adicionais que possam surgir
+em `/data` no futuro, sujeitos às regras de exclusão do script.
 
-The archive intentionally excludes:
+O arquivo compactado exclui intencionalmente:
 
 ```text
 db.sqlite3-wal
@@ -1174,45 +1172,45 @@ db_*.sqlite3
 tmp/
 ```
 
-The database included in the final archive is the consistent SQLite copy
-generated by Vaultwarden's native backup mechanism.
+O banco de dados incluído no arquivo final é a cópia consistente do SQLite
+gerada pelo mecanismo de backup nativo do Vaultwarden.
 
 ---
 
-# 32. Backup Integrity
+# 32. Integridade do Backup
 
-Each backup produces:
+Cada backup produz:
 
 ```text
 vaultwarden_YYYYMMDD_HHMMSS.tar.gz
 ```
 
-and:
+e:
 
 ```text
 vaultwarden_YYYYMMDD_HHMMSS.tar.gz.sha256
 ```
 
-Example:
+Exemplo:
 
 ```text
 vaultwarden_20260922_155527.tar.gz
 vaultwarden_20260922_155527.tar.gz.sha256
 ```
 
-The archive is validated using:
+O arquivo é validado utilizando:
 
 ```bash
 tar -tzf archive.tar.gz
 ```
 
-and:
+e:
 
 ```bash
 sha256sum -c archive.tar.gz.sha256
 ```
 
-A real backup test produced:
+Um teste real de backup produziu:
 
 ```text
 TAR OK
@@ -1221,156 +1219,156 @@ checksum OK
 
 ---
 
-# 33. Backup Restore Test
+# 33. Teste de Restauração de Backup
 
-A real restore test was already performed.
+Um teste real de restauração já foi realizado.
 
-Process:
+Processo:
 
 ```text
-production backup
+backup de produção
         |
         v
-separate restore directory
+diretório de restore separado
         |
         v
-temporary Vaultwarden container
+container temporário do Vaultwarden
         |
         v
-Vaultwarden started
+Vaultwarden iniciado
         |
         v
-Web Vault accessible
+Web Vault acessível
         |
         v
-account data recovered
+dados da conta recuperados
 ```
 
-The restore instance successfully started and presented the Vaultwarden login
-screen.
+A instância de restauração inicializou com sucesso e apresentou a tela de login
+do Vaultwarden.
 
-This proves that the backup is not merely syntactically valid; it is capable of
-reconstructing a functional Vaultwarden instance.
+Isso comprova que o backup não é meramente válido sintaticamente; ele é capaz de
+reconstruir uma instância funcional do Vaultwarden.
 
-The restore test instance was then removed.
+A instância do teste de restauração foi removida em seguida.
 
-Temporary restore resources must not remain on the production server.
+Recursos temporários de restauração não devem permanecer no servidor de produção.
 
 ---
 
-# 34. Backup Script Behavior
+# 34. Comportamento do Script de Backup
 
-The backup script performs approximately the following process:
+O script de backup executa aproximadamente o seguinte fluxo:
 
 ```text
-1. Verify Vaultwarden container exists.
-2. Verify container is running.
-3. Verify application is healthy.
-4. Run the native Vaultwarden SQLite backup.
-5. Stop Vaultwarden cleanly.
-6. Copy required persistent non-live database data.
-7. Insert the consistent SQLite backup as db.sqlite3.
-8. Create compressed archive.
-9. Generate SHA-256 checksum.
-10. Validate archive content.
-11. Remove temporary database backup files.
-12. Start Vaultwarden.
-13. Wait for Vaultwarden to become healthy.
-14. Validate checksum.
-15. Prune old backups older than RETENTION_DAYS=10 and matching .sha256 files.
-16. Report success.
+1. Verifica se o container do Vaultwarden existe.
+2. Verifica se o container está em execução.
+3. Verifica se a aplicação está saudável (healthy).
+4. Executa o backup nativo do SQLite no Vaultwarden.
+5. Para o Vaultwarden de forma limpa.
+6. Copia os dados persistentes necessários não voláteis.
+7. Insere o backup consistente do SQLite como db.sqlite3.
+8. Cria o arquivo compactado.
+9. Gera o checksum SHA-256.
+10. Valida o conteúdo do arquivo compactado.
+11. Remove arquivos temporários de backup do banco de dados.
+12. Inicia o Vaultwarden.
+13. Aguarda o Vaultwarden retornar ao estado saudável (healthy).
+14. Valida o checksum.
+15. Remove backups antigos com mais de RETENTION_DAYS=10 e seus arquivos .sha256 correspondentes.
+16. Reporta sucesso.
 ```
 
-The script uses a lock to prevent concurrent backups.
+O script utiliza um lock para prevenir backups concorrentes.
 
-The healthcheck wait logic was intentionally increased because the Vaultwarden
-Docker image's healthcheck does not necessarily run immediately after container
-startup.
+A lógica de espera pelo healthcheck foi intencionalmente aumentada porque o healthcheck
+da imagem Docker do Vaultwarden não roda necessariamente de forma imediata após a inicialização
+do container.
 
-The current health wait period has been adjusted to tolerate the image's
-healthcheck interval.
+O período atual de espera de saúde foi ajustado para tolerar o intervalo de
+healthcheck da imagem.
 
 ---
 
-# 35. Backup Lessons Learned
+# 35. Lições Aprendidas sobre Backup
 
-Important:
+Importante:
 
-Do NOT assume:
+NÃO assuma que:
 
 ```text
 docker container running
 ```
 
-means:
+significa:
 
 ```text
-backup completed correctly
+backup concluído corretamente
 ```
 
-Also do NOT assume:
+Também NÃO assuma que:
 
 ```text
-.tar.gz exists
+.tar.gz existe
 ```
 
-means:
+significa:
 
 ```text
-backup is restorable
+backup é restaurável
 ```
 
-The correct validation chain is:
+A cadeia correta de validação é:
 
 ```text
 backup
     ->
-archive
+arquivo compactado
     ->
 checksum
     ->
-archive content
+conteúdo do arquivo
     ->
 restore
     ->
-application startup
+inicialização da aplicação
     ->
-login test
+teste de login
 ```
 
 ---
 
-# 36. Local Backup Retention
+# 36. Retenção do Backup Local
 
-Local backups are stored in:
+Backups locais são armazenados em:
 
 ```text
 /var/backups/vaultwarden
 ```
 
-### Retention Policy:
+### Política de Retenção:
 
-- Configured retention window: **10 days** (`RETENTION_DAYS=10`).
-- Pruning runs strictly **after** the new backup has been created and verified (`tar -tzf` and `sha256sum -c`).
-- It scans `/var/backups/vaultwarden` for archives older than 10 days (`vaultwarden_*.tar.gz`).
-- For each expired archive, both the archive file and its matching `.sha256` checksum file are removed.
+- Janela de retenção configurada: **10 dias** (`RETENTION_DAYS=10`).
+- O expurgo é executado estritamente **após** o novo backup ter sido criado e verificado (`tar -tzf` e `sha256sum -c`).
+- Ele varre `/var/backups/vaultwarden` procurando arquivos com mais de 10 dias (`vaultwarden_*.tar.gz`).
+- Para cada arquivo expirado, tanto o arquivo compactado quanto o seu arquivo de checksum `.sha256` correspondente são removidos.
 
-### Controlled Validation Test:
+### Teste de Validação Controlado:
 
-- A controlled test was performed by creating a **FICTITIOUS** backup pair (`vaultwarden_*.tar.gz` and `.sha256`) with a simulated age of 15 days, created exclusively for validation purposes.
-- A real execution of `vaultwarden-backup.service` was triggered via `systemctl start vaultwarden-backup.service`.
-- The script successfully created the new backup and validated its SHA-256 checksum.
-- The fictitious expired backup pair was successfully removed by `prune_old_backups`.
-- All genuine real backups remained intact.
-- Vaultwarden completed the execution in `running/healthy` state.
+- Um teste controlado foi realizado criando um par de backup **FICTÍCIO** (`vaultwarden_*.tar.gz` e `.sha256`) com idade simulada de 15 dias, criado exclusivamente para fins de validação.
+- Uma execução real do `vaultwarden-backup.service` foi disparada via `systemctl start vaultwarden-backup.service`.
+- O script criou o novo backup com sucesso e validou seu checksum SHA-256.
+- O par de backup fictício expirado foi removido com sucesso pela função `prune_old_backups`.
+- Todos os backups reais genuínos permaneceram intactos.
+- O Vaultwarden concluiu a execução no estado `running/healthy`.
 
 ---
 
-# 37. Backup Automation
+# 37. Automação do Backup
 
-Backup execution is automated using systemd timer and service units.
+A execução do backup é automatizada através de unidades de timer e serviço do systemd.
 
-Architecture:
+Arquitetura:
 
 ```text
 vaultwarden-backup.timer
@@ -1379,14 +1377,14 @@ vaultwarden-backup.service
         ↓
 /usr/local/sbin/vaultwarden-backup
         ↓
-native SQLite backup
+backup nativo SQLite
         ↓
-archive + SHA-256
+arquivo compactado + SHA-256
         ↓
 /var/backups/vaultwarden/
 ```
 
-### Components:
+### Componentes:
 
 - Service Unit: `/etc/systemd/system/vaultwarden-backup.service`
   - `Type=oneshot`
@@ -1398,135 +1396,151 @@ archive + SHA-256
   - `TimeoutStartSec=20min`
 
 - Timer Unit: `/etc/systemd/system/vaultwarden-backup.timer`
-  - Schedule: `OnCalendar=*-*-* 03:00:00` (daily at 03:00)
+  - Agendamento: `OnCalendar=*-*-* 03:00:00` (diariamente às 03:00)
   - `Persistent=true`
   - `WantedBy=timers.target`
-  - State: enabled and active
+  - Estado: habilitado e ativo
 
-### Validation Status:
+### Status de Validação:
 
-- The backup script was previously validated.
-- `vaultwarden-backup.service` was created as `Type=oneshot`, depending on `docker.service`.
-- `vaultwarden-backup.timer` was created, enabled, and is active waiting for the next execution.
-- Manual execution of the service was performed successfully (`systemctl start vaultwarden-backup.service`).
-- The backup `vaultwarden_20260922_173509.tar.gz` was created successfully.
-- The corresponding `.sha256` checksum file was created and validated.
-- Vaultwarden finished the process in `running/healthy` state.
-- The daily 03:00 systemd backup execution was observed in real execution: backup file 'vaultwarden_20260923_030040.tar.gz'. Therefore, the daily systemd timer is effectively functioning in production.
-- Local retention remains 10 days (`RETENTION_DAYS=10`).
+- O script de backup foi validado anteriormente.
+- `vaultwarden-backup.service` foi criado como `Type=oneshot`, dependente de `docker.service`.
+- `vaultwarden-backup.timer` foi criado, habilitado e está ativo aguardando a próxima execução.
+- A execução manual do serviço foi realizada com sucesso (`systemctl start vaultwarden-backup.service`).
+- O backup `vaultwarden_20260922_173509.tar.gz` foi criado com sucesso.
+- O arquivo de checksum `.sha256` correspondente foi criado e validado.
+- O Vaultwarden finalizou o processo no estado `running/healthy`.
+- A execução diária do backup via systemd às 03:00 foi observada em execução real: arquivo de backup 'vaultwarden_20260923_030040.tar.gz'. Portanto, o timer diário do systemd está efetivamente funcionando em produção.
+- A retenção local permanece em 10 dias (`RETENTION_DAYS=10`).
 
-Important:
+Importante:
 
-Currently, there is NO centralized monitoring server (such as Zabbix) deployed in production for this environment.
-Operational verification relies directly on systemd service logs (`journalctl -u vaultwarden-backup.service`), timer inspection (`systemctl list-timers`), and verifying generated archive files and checksums in `/var/backups/vaultwarden/`.
-The absence of proactive centralized alerting is a known limitation, and centralized backup monitoring via Zabbix is categorized as a future improvement / evolution, not a prerequisite for local backup.
+Atualmente, NÃO existe servidor de monitoramento centralizado (como Zabbix) implantado em produção para este ambiente.
+A verificação operacional apoia-se diretamente nos logs do serviço systemd (`journalctl -u vaultwarden-backup.service`), inspeção do timer (`systemctl list-timers`) e na verificação dos arquivos gerados e checksums em `/var/backups/vaultwarden/`.
+A ausência de alertas centralizados proativos é uma limitação operacional conhecida, e o monitoramento centralizado de backup via Zabbix está classificado como uma melhoria futura / evolução, e não como um pré-requisito para o backup local.
 
 ---
 
-# 38. Off-site Backup — OCI (Implemented & Validated)
+# 38. Backup Off-site — OCI via Restic (Implementado e Automatizado)
 
-Off-site backup to Oracle Cloud Infrastructure (OCI Object Storage) via Restic has been implemented and validated, including end-to-end restore validation in an isolated temporary environment.
+O backup off-site para a Oracle Cloud Infrastructure (OCI Object Storage) via Restic está implementado, automatizado via systemd e validado com restauração ponta a ponta em ambiente temporário isolado.
 
-### Architecture:
+### Arquitetura:
 
 ```text
 Vaultwarden
     |
     v
-local backup archive (/var/backups/vaultwarden) [10-day retention]
+arquivo de backup local (/var/backups/vaultwarden) [retenção local de 10 dias]
+    |
+    v (vaultwarden-offsite-backup.service via timer 03:30)
+Restic (criptografia client-side)
     |
     v
-Restic (client-side encryption) [Manual execution]
-    |
-    v
-OCI Object Storage (private bucket)
+OCI Object Storage (bucket privado vaultwarden-offsite) [retenção remota de 10 dias]
 ```
 
-### OCI Environment Configuration:
+### Configuração do Ambiente OCI:
 
-- Region: `sa-saopaulo-1`
+- Região: `sa-saopaulo-1`
 - Namespace: `groqo9fbzuaz`
 - Compartment: `Backups`
-- Bucket: `vaultwarden-offsite` (strictly private, no public access)
-- API: S3-compatible API
-- Restic Repository ID: `7bbbe221`
-- Security & Secrets: OCI API credentials and Restic repository encryption key are stored securely on the host outside Git and are NEVER committed to the repository.
+- Bucket: `vaultwarden-offsite` (estritamente privado, sem acesso público)
+- API: API compatível com S3
+- ID do Repositório Restic: `7bbbe221`
+- Segurança e Segredos: Credenciais em `/etc/vaultwarden-backup/oci.env` e chave de criptografia do repositório Restic são armazenadas com segurança no host fora do Git e NUNCA são comitadas no repositório.
 
-### Restic Validation Lifecycle:
+### Automação Off-site e Implementação no Systemd:
 
-1. **Repository Initialization:** Initialized successfully (`restic init`).
-2. **Initial Check:** `restic check` ran cleanly without errors.
-3. **Test Snapshot:** Test backup uploaded successfully.
-4. **Test Restore:** Test restore executed successfully and verified.
-5. **Prune Test:** Test snapshot purged with `restic forget --prune`.
-6. **Post-Prune Check:** `restic check` verified repository consistency with zero errors.
+A automação é composta por três componentes versionados em `backup/`:
+- **Script:** `/usr/local/sbin/vaultwarden-offsite-backup`
+  - Obtém lock exclusivo em `/run/lock/vaultwarden-offsite-backup.lock`.
+  - Carrega variáveis a partir de `/etc/vaultwarden-backup/oci.env`.
+  - Varre `/var/backups/vaultwarden` em busca de backup local recente criado nos últimos 120 minutos (`-mmin -120`), realizando até 60 tentativas (intervalo de 30s) para garantir que o backup local das 03:00 tenha concluído.
+  - Valida o checksum SHA-256 do backup local (`sha256sum -c "${LATEST}.sha256"`).
+  - Envia backups para o OCI: `restic -o s3.bucket-lookup=path backup /var/backups/vaultwarden`.
+  - Aplica retenção remota de 10 dias: `restic -o s3.bucket-lookup=path forget --keep-within 10d --prune`.
+  - Verifica a integridade do repositório: `restic -o s3.bucket-lookup=path check`.
+- **Service Unit:** `/etc/systemd/system/vaultwarden-offsite-backup.service`
+  - `Type=oneshot`, `After=vaultwarden-backup.service`
+  - `ExecStart=/usr/local/sbin/vaultwarden-offsite-backup`
+  - `Environment=HOME=/root` (corrige explicitamente o aviso de diretório de cache do Restic durante a execução sob o systemd)
+  - `UMask=0077`, `NoNewPrivileges=true`, `TimeoutStartSec=60min`
+- **Timer Unit:** `/etc/systemd/system/vaultwarden-offsite-backup.timer`
+  - `OnCalendar=*-*-* 03:30:00` (agendado diariamente às 03:30, 30 minutos após o backup local)
+  - `Persistent=true`
+  - `WantedBy=timers.target`
 
-### Real Production Backup Upload:
+### Ciclo de Validação do Restic e Upload Real:
 
-- Real local backup archive created at: `/var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz`.
-- Uploaded to OCI via Restic (executed **MANUALLY**).
-- Real Restic snapshot created: `d5f61547`.
-- `restic check` after upload completed with: `no errors were found`.
+1. **Inicialização do Repositório:** Inicializado com sucesso (`restic init`).
+2. **Verificação Inicial:** `restic check` executou de forma limpa sem erros.
+3. **Snapshot de Teste e Restore:** Backup de teste enviado, verificado e expurgado com `forget --prune`.
+4. **Execução Manual do Serviço Validada:** `systemctl start vaultwarden-offsite-backup.service` executou com sucesso.
+   - Identificou o backup local recente (`vaultwarden_20260923_181123.tar.gz`).
+   - Validou o checksum SHA-256 do arquivo local.
+   - Snapshot Restic real criado (`d5f61547`).
+   - `restic check` concluiu com: `no errors were found`.
+   - Retenção remota `forget --keep-within 10d --prune` executada com sucesso.
+   - Aviso de cache do Restic eliminado via `Environment=HOME=/root`.
 
-### Real Restore Validation from OCI:
+### Validação de Restauração Real a partir do OCI:
 
-- Restore of snapshot `d5f61547` performed to an isolated temporary environment: `/tmp/restic-vaultwarden-restore`.
-- 17 files/directories successfully restored.
-- Restored file: `vaultwarden_20260923_181123.tar.gz`.
-- Restored SHA-256: `fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40`.
-- The restored SHA-256 strictly matched the stored `.sha256` checksum file.
-- The restored TAR archive contains `./db.sqlite3` and `./rsa_key.pem`.
-- The temporary restore directory `/tmp/restic-vaultwarden-restore` was completely removed after validation.
-- The production Vaultwarden instance was NOT replaced or altered during the restore test.
+- Restauração do snapshot `d5f61547` realizada para um ambiente temporário isolado: `/tmp/restic-vaultwarden-restore` (anteriormente à automação).
+- 17 arquivos/diretórios restaurados com sucesso.
+- Arquivo restaurado: `vaultwarden_20260923_181123.tar.gz`.
+- SHA-256 restaurado: `fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40` (coincidiu estritamente com o arquivo `.sha256` armazenado).
+- Arquivo TAR restaurado confirmado como contendo `./db.sqlite3` e `./rsa_key.pem`.
+- O diretório temporário de restauração foi removido após a validação.
+- A instância de produção do Vaultwarden NÃO foi substituída nem alterada durante o teste de restore.
 
-### Important Operational Distinctions:
+### Distinções de Status Operacional:
 
-- **Manual Upload:** The real upload to OCI was executed **manually**.
-- **Pending Automation:** Daily automation of the OCI upload (systemd timer/service) has NOT yet been implemented. Do not document OCI upload as automated.
-- **Pending Remote Retention:** Remote retention policy for the Restic repository (e.g., automated pruning of old snapshots) is NOT yet implemented.
+- **Backup Local (03:00):** A execução automática pelo timer do systemd foi observada e validada em produção real (`vaultwarden_20260923_030040.tar.gz`).
+- **Backup Off-site (03:30):** O serviço está implementado e validado manualmente. A execução automática agendada do `vaultwarden-offsite-backup.timer` às 03:30 ainda NÃO foi observada em produção. Documentar como "configurado e validado manualmente", mas NÃO como "execução automática validada".
 
 ---
 
-# 39. OCI Backup Requirements & Security Posture
+# 39. Requisitos do Backup OCI e Postura de Segurança
 
-- Bucket `vaultwarden-offsite` remains strictly private without public object access.
-- Dedicated credential with minimum required permissions.
-- OCI secrets and Restic repository password are NEVER stored in Git or public docs.
-- Client-side encryption is enforced by Restic before any data leaves the host.
-- Restore from OCI was tested and validated in an isolated environment without affecting production.
+- O bucket `vaultwarden-offsite` permanece estritamente privado, sem acesso público a objetos.
+- Credencial dedicada com permissões mínimas necessárias.
+- Segredos do OCI e senha do repositório Restic NUNCA são armazenados no Git ou em documentos públicos.
+- Criptografia client-side é aplicada pelo Restic antes que qualquer dado saia do host.
+- A restauração a partir do OCI foi testada e validada em ambiente isolado sem afetar a produção.
 
 ---
 
-# 40. Disaster Recovery Objective
+# 40. Objetivo de Recuperação de Desastres (Disaster Recovery)
 
-The intended disaster recovery path is:
+O fluxo pretendido de recuperação de desastres é:
 
 ```text
-VM destroyed
+VM destruída
     |
     v
-Create new Debian VM
+Criar nova VM Debian
     |
     v
-Configure hostname/network
+Configurar hostname/rede
     |
     v
-Install Docker
+Instalar Docker
     |
     v
-Restore versioned configuration
+Restaurar configuração versionada
     |
     v
-Install/start Vaultwarden
+Instalar/iniciar Vaultwarden
     |
     v
-Restore backup from OCI
+Restaurar backup do OCI
     |
     v
-Restore persistent data
+Restaurar dados persistentes
     |
     v
-Configure Cloudflare Tunnel
+Configurar Cloudflare Tunnel
     |
     v
 https://vault.rufonex.com.br
@@ -1535,99 +1549,99 @@ https://vault.rufonex.com.br
 Login + TOTP
 ```
 
-The system should NOT depend on the original VM surviving.
+O sistema NÃO deve depender da sobrevivência da VM original.
 
 ---
 
-# 41. Proxmox Backup Strategy
+# 41. Estratégia de Backup do Proxmox
 
-A Proxmox/PBS backup of the VM was taken before Docker/Vaultwarden production
-deployment.
+Um backup Proxmox/PBS da VM foi realizado antes do deployment de produção
+do Docker/Vaultwarden.
 
-That backup represents the baseline VM state after:
+Esse backup representa o estado de baseline da VM após:
 
-- Debian installation
-- system updates
-- network configuration
-- firewall hardening
-- SSH hardening
+- instalação do Debian
+- atualizações do sistema
+- configuração de rede
+- hardening de firewall
+- hardening de SSH
 - QEMU Guest Agent
 
-The Proxmox/PBS backup was validated successfully.
+O backup Proxmox/PBS foi validado com sucesso.
 
-This gives a second recovery layer:
+Isso fornece uma segunda camada de recuperação:
 
 ```text
-Application backup
+Backup da aplicação
     +
-VM backup
+Backup da VM
 ```
 
-These are complementary.
+Eles são complementares.
 
 ---
 
-# 42. Recovery Layers
+# 42. Camadas de Recuperação
 
-The intended recovery hierarchy is:
+A hierarquia pretendida de recuperação é:
 
-### Layer 1 — Application recovery
+### Camada 1 — Recuperação da Aplicação
 
-Restore:
+Restaurar:
 
 ```text
 Vaultwarden /data
 ```
 
-from the application backup.
+a partir do backup da aplicação.
 
-### Layer 2 — VM recovery
+### Camada 2 — Recuperação da VM
 
-Restore the complete VM from Proxmox/PBS.
+Restaurar a VM completa a partir do Proxmox/PBS.
 
-### Layer 3 — Site disaster
+### Camada 3 — Desastre de Site
 
-Rebuild the VM elsewhere and restore the encrypted off-site backup.
-
----
-
-# 43. Security Principles
-
-This deployment follows these principles:
-
-1. No direct Internet port-forwarding to Vaultwarden.
-2. Cloudflare Tunnel is the public ingress mechanism.
-3. Vaultwarden has a dedicated VM.
-4. Host firewall defaults to DROP on inbound traffic.
-5. SSH uses public-key authentication.
-6. Root SSH login is disabled.
-7. Password authentication over SSH is disabled.
-8. Only the management LAN can access SSH.
-9. Only Cloudflared can access the published Vaultwarden port.
-10. Public signup is disabled.
-11. Invitations are disabled.
-12. TOTP is enabled.
-13. Docker uses `no-new-privileges`.
-14. Docker logs have controlled rotation.
-15. Vaultwarden image is pinned by digest.
-16. Persistent application data is stored outside the container filesystem.
-17. Backups are validated.
-18. Restore has been tested.
-19. Secrets are not stored in Git.
+Reconstruir a VM em outro local e restaurar o backup off-site criptografado.
 
 ---
 
-# 44. Git Security Rules
+# 43. Princípios de Segurança
 
-NEVER commit:
+Este deployment segue estes princípios:
+
+1. Sem redirecionamento direto de portas da Internet para o Vaultwarden.
+2. Cloudflare Tunnel é o mecanismo de ingresso público.
+3. Vaultwarden possui uma VM dedicada.
+4. Firewall do host tem DROP como padrão para tráfego de entrada (inbound).
+5. SSH utiliza autenticação exclusivamente por chave pública.
+6. Login root via SSH está desabilitado.
+7. Autenticação por senha via SSH está desabilitada.
+8. Apenas a LAN de gerenciamento pode acessar o SSH.
+9. Apenas o Cloudflared pode acessar a porta publicada do Vaultwarden.
+10. Cadastro público (signups) está desabilitado.
+11. Convites estão desabilitados.
+12. TOTP está habilitado.
+13. Docker utiliza `no-new-privileges`.
+14. Logs do Docker possuem rotação controlada.
+15. Imagem do Vaultwarden é fixada por digest.
+16. Dados persistentes da aplicação são armazenados fora do filesystem do container.
+17. Backups são validados.
+18. A restauração foi testada.
+19. Segredos não são armazenados no Git.
+
+---
+
+# 44. Regras de Segurança para o Git
+
+NUNCA comite:
 
 ```text
 .env
 ```
 
-when it contains secrets or environment-specific sensitive values.
+quando contiver segredos ou valores sensíveis específicos do ambiente.
 
-NEVER commit:
+NUNCA comite:
 
 ```text
 *.pem
@@ -1635,9 +1649,9 @@ NEVER commit:
 *.secret
 ```
 
-when they contain private keys or credentials.
+quando contiverem chaves privadas ou credenciais.
 
-NEVER commit:
+NUNCA comite:
 
 ```text
 db.sqlite3
@@ -1646,32 +1660,32 @@ db.sqlite3
 *.sqlite3-shm
 ```
 
-NEVER commit:
+NUNCA comite:
 
 ```text
 *.tar.gz
 ```
 
-when they are Vaultwarden backups.
+quando forem backups do Vaultwarden.
 
-NEVER commit:
+NUNCA comite:
 
-- Cloudflare tunnel tokens
-- OCI access keys
-- OCI secret keys
-- TOTP secrets
-- TOTP recovery codes
-- Vaultwarden recovery codes
-- SSH private keys
-- real user credentials
+- tokens do Cloudflare Tunnel
+- chaves de acesso OCI (access keys)
+- chaves secretas OCI (secret keys)
+- segredos TOTP
+- códigos de recuperação TOTP
+- códigos de recuperação do Vaultwarden
+- chaves privadas SSH
+- credenciais reais de usuários
 
-Public configuration templates are acceptable.
+Modelos públicos de configuração (templates) são aceitáveis.
 
 ---
 
-# 45. Recommended Git Structure
+# 45. Estrutura Recomendada para o Git
 
-Target repository structure:
+Estrutura alvo do repositório:
 
 ```text
 vaultwarden-infra/
@@ -1713,161 +1727,163 @@ vaultwarden-infra/
     └── architecture.mmd
 ```
 
-The exact structure may evolve, but secrets and production data must remain
-outside Git.
+A estrutura exata pode evoluir, mas segredos e dados de produção devem permanecer
+fora do Git.
 
 ---
 
-# 46. Current Production State
+# 46. Estado Atual em Produção
 
-## Completed
+## Concluído
 
 ```text
-Debian 13 VM                         DONE
-Static/reserved IP                   DONE
-SSH access                           DONE
-SSH key authentication               DONE
-SSH hardening                        DONE
-Root SSH disabled                    DONE
-Firewall base                        DONE
-Firewall persistence                 DONE
-Firewall reboot test                 DONE
-QEMU Guest Agent                     DONE
-System time synchronization          DONE
-Docker Engine                        DONE
-Docker Compose                       DONE
-Docker daemon hardening              DONE
-Docker firewall integration          DONE
-Vaultwarden container                DONE
-SQLite                               DONE
-Persistent /data                     DONE
-Image digest pinning                 DONE
-Cloudflare Tunnel                    DONE
-Public HTTPS domain                  DONE
-Vaultwarden account                  DONE
-Login/logout test                    DONE
-Bitwarden browser extension         DONE
-TOTP                                  DONE
-Signup disabled                      DONE
-Backup script                        DONE
-Backup integrity test                DONE
-Backup restore test                  DONE
-Systemd backup timer                 DONE
-Backup retention automation          DONE
-Proxmox/PBS baseline backup          DONE
-Restic repository OCI                DONE
-Upload real para OCI                 DONE
-restic check                         DONE
-Restore de backup real a partir do OCI DONE
-Validação do SHA-256 do backup recuperado DONE
+Debian 13 VM                                                  CONCLUÍDO
+IP estático/reservado                                         CONCLUÍDO
+Acesso SSH                                                    CONCLUÍDO
+Autenticação SSH por chave pública                            CONCLUÍDO
+Hardening de SSH                                              CONCLUÍDO
+Root SSH desabilitado                                         CONCLUÍDO
+Firewall base                                                 CONCLUÍDO
+Persistência de firewall                                      CONCLUÍDO
+Teste de reboot do firewall                                   CONCLUÍDO
+QEMU Guest Agent                                              CONCLUÍDO
+Sincronização de horário do sistema                           CONCLUÍDO
+Docker Engine                                                 CONCLUÍDO
+Docker Compose                                                CONCLUÍDO
+Hardening do daemon do Docker                                 CONCLUÍDO
+Integração do firewall com Docker                             CONCLUÍDO
+Container do Vaultwarden                                      CONCLUÍDO
+SQLite                                                        CONCLUÍDO
+/data persistente                                             CONCLUÍDO
+Pinning da imagem por digest                                  CONCLUÍDO
+Cloudflare Tunnel                                             CONCLUÍDO
+Domínio HTTPS público                                         CONCLUÍDO
+Conta do Vaultwarden                                          CONCLUÍDO
+Teste de login/logout                                         CONCLUÍDO
+Extensão do navegador Bitwarden                               CONCLUÍDO
+TOTP                                                          CONCLUÍDO
+Cadastro público desabilitado                                 CONCLUÍDO
+Script de backup                                              CONCLUÍDO
+Teste de integridade do backup                                CONCLUÍDO
+Teste de restauração de backup                                CONCLUÍDO
+Timer de backup via systemd                                   CONCLUÍDO
+Automação de retenção de backup local                         CONCLUÍDO
+Backup de baseline no Proxmox/PBS                             CONCLUÍDO
+Repositório Restic no OCI                                     CONCLUÍDO
+Upload real para OCI                                          CONCLUÍDO
+restic check                                                  CONCLUÍDO
+Restore de backup real a partir do OCI                        CONCLUÍDO
+Validação do SHA-256 do backup recuperado                     CONCLUÍDO
+Script de backup off-site (vaultwarden-offsite-backup)        CONCLUÍDO
+Service unit de backup off-site                               CONCLUÍDO
+Timer unit de backup off-site (03:30)                         CONCLUÍDO
+Retenção remota de 10 dias no OCI (forget --prune)            CONCLUÍDO
+Correção de cache do Restic (Environment=HOME=/root)          CONCLUÍDO
 ```
 
 ---
 
-# 47. Remaining Work / Future Improvements
+# 47. Trabalho Restante / Melhorias Futuras
 
-The local backup is fully implemented, scheduled via systemd, validated, with 10-day retention and restore tested.
-Off-site backup to OCI via Restic is initialized, verified, real backup uploaded manually, and real restore validated in an isolated temporary environment.
+O backup local está totalmente implementado, agendado via systemd (execução diária às 03:00 observada), validado, com retenção de 10 dias e restore testado.
+O backup off-site para o OCI via Restic está automatizado via systemd (`vaultwarden-offsite-backup.service`/`timer` 03:30), validado manualmente, com retenção remota de 10 dias e restore verificado a partir do OCI em ambiente isolado.
 
-Future improvements / evolutions:
+Melhorias futuras / evoluções:
 
 ```text
-Automação do upload off-site (timer/service systemd para envio diário ao OCI)
-Política de retenção do repositório Restic (forget --prune automatizado)
+Observação da execução automática do timer off-site (vaultwarden-offsite-backup.timer às 03:30)
 Monitoramento centralizado (ex.: Zabbix; sem servidor Zabbix no ambiente atualmente)
 Teste completo de disaster recovery (reconstrução ponta a ponta em outro hypervisor)
 Verificação periódica de restore
-OCI credential hardening
-Regular Vaultwarden update procedure
-Formal maintenance runbook
+Hardening de credenciais OCI
+Procedimento regular de atualização do Vaultwarden
+Runbook formal de manutenção
 ```
 
-Do not document these as completed until they are actually implemented and
-tested.
+Não documente estes itens como concluídos até que tenham sido efetivamente implementados e testados.
 
 ---
 
-# 48. Operational Rules for Future Changes
+# 48. Regras Operacionais para Mudanças Futuras
 
-Before changing production:
+Antes de alterar a produção:
 
 ```text
-1. Read this PROJECT_CONTEXT.md.
-2. Check the current production state.
-3. Create a backup when appropriate.
-4. Make the smallest required change.
-5. Validate configuration before restarting services.
-6. Test functionality.
-7. Check logs.
-8. Check health status.
-9. Update documentation.
-10. Commit configuration changes to Git.
+1. Ler este PROJECT_CONTEXT.md.
+2. Verificar o estado atual de produção.
+3. Criar um backup quando apropriado.
+4. Fazer a menor alteração necessária.
+5. Validar a configuração antes de reiniciar serviços.
+6. Testar a funcionalidade.
+7. Verificar logs.
+8. Verificar status de saúde (health).
+9. Atualizar a documentação.
+10. Comitar alterações de configuração no Git.
 ```
 
-Never make undocumented manual changes that cannot be reproduced.
+Nunca faça alterações manuais não documentadas que não possam ser reproduzidas.
 
 ---
 
-# 49. Version Upgrade Policy
+# 49. Política de Atualização de Versões
 
-Vaultwarden upgrades must be intentional.
+Atualizações do Vaultwarden devem ser intencionais.
 
-Do NOT blindly run:
+NÃO execute cegamente:
 
 ```bash
 docker compose pull
 ```
 
-against an unpinned `latest` image.
+contra uma imagem não fixada (`latest`).
 
-Upgrade process:
+Processo de atualização:
 
 ```text
-1. Review Vaultwarden release notes.
-2. Check whether the version contains security fixes.
-3. Create a current application backup.
-4. Confirm backup integrity.
-5. Update the image digest intentionally.
-6. Pull the new image.
-7. Recreate the container.
-8. Wait for healthcheck.
-9. Verify Web Vault.
-10. Verify browser extension.
-11. Verify login/TOTP.
-12. Check logs.
-13. Document the version change.
+1. Revisar as notas de versão do Vaultwarden.
+2. Verificar se a versão contém correções de segurança.
+3. Criar um backup atual da aplicação.
+4. Confirmar a integridade do backup.
+5. Atualizar o digest da imagem intencionalmente.
+6. Baixar a nova imagem (pull).
+7. Recriar o container.
+8. Aguardar o healthcheck.
+9. Verificar o Web Vault.
+10. Verificar a extensão do navegador.
+11. Verificar login/TOTP.
+12. Checar logs.
+13. Documentar a mudança de versão.
 ```
 
-Rollback must remain possible through the previous known-good image digest
-and backup.
+O rollback deve permanecer possível através do digest da imagem e do backup anteriores funcionais conhecidos.
 
 ---
 
-# 50. Troubleshooting Principles
+# 50. Princípios de Troubleshooting
 
-When diagnosing Vaultwarden:
+Ao diagnosticar o Vaultwarden:
 
-Check in this order:
+Verificar nesta ordem:
 
 ```text
-Network
+Rede
     ->
 Cloudflare Tunnel
     ->
-host port
+porta do host
     ->
 DOCKER-USER
     ->
-Docker port mapping
+mapeamento de portas do Docker
     ->
 container
     ->
-application health
+saúde da aplicação
     ->
 SQLite
 ```
 
-Useful commands:
+Comandos úteis:
 
 ```bash
 sudo docker compose -f /opt/vaultwarden/docker-compose.yaml ps
@@ -1904,109 +1920,107 @@ curl -i http://192.168.15.200:8080/alive
 
 ---
 
-# 51. Important Operational Distinction
+# 51. Distinção Operacional Importante
 
-These are different concepts:
+Estes são conceitos distintos:
 
 ```text
-VM availability
-Docker availability
-Container availability
-Application health
-External reachability
-Authentication availability
-Backup availability
-Restore availability
+Disponibilidade da VM
+Disponibilidade do Docker
+Disponibilidade do container
+Saúde da aplicação
+Alcance externo
+Disponibilidade de autenticação
+Disponibilidade de backup
+Disponibilidade de restauração
 ```
 
-A successful healthcheck does not prove the external Cloudflare route works.
+Um healthcheck bem-sucedido não prova que a rota externa da Cloudflare funciona.
 
-A successful Cloudflare request does not prove the backup works.
+Uma requisição bem-sucedida da Cloudflare não prova que o backup funciona.
 
-A successful backup creation does not prove restore works.
+Uma criação bem-sucedida de backup não prova que a restauração funciona.
 
-Each layer must be tested independently.
+Cada camada deve ser testada de forma independente.
 
 ---
 
-# 52. Current Mental Model
+# 52. Modelo Mental Atual
 
-The most important mental model for this infrastructure is:
+O modelo mental mais importante para esta infraestrutura é:
 
 ```text
-                       PUBLIC ACCESS
-                            |
-                      Cloudflare TLS
-                            |
-                     Cloudflare Tunnel
-                            |
-                       .253 LXC
-                            |
-                       HTTP :8080
-                            |
-                       .200 VM
-                            |
-                        Docker
-                            |
-                     DOCKER-USER
-                            |
-                     VW-DOCKER
-                            |
-                      Vaultwarden
-                            |
-                          SQLite
-                            |
-                        /data
-                            |
-                  +---------+---------+
-                  |                   |
-             local backup         off-site backup
-                                      |
-                                     OCI
+                       ACESSO PÚBLICO
+                             |
+                       Cloudflare TLS
+                             |
+                      Cloudflare Tunnel
+                             |
+                        .253 LXC
+                             |
+                        HTTP :8080
+                             |
+                        .200 VM
+                             |
+                         Docker
+                             |
+                      DOCKER-USER
+                             |
+                      VW-DOCKER
+                             |
+                       Vaultwarden
+                             |
+                           SQLite
+                             |
+                         /data
+                             |
+                   +---------+---------+
+                   |                   |
+             backup local        backup off-site
+                                       |
+                                      OCI
 ```
 
-The security boundary exists at several layers:
+A fronteira de segurança existe em várias camadas:
 
 ```text
 Cloudflare
     +
-network
+rede
     +
-host firewall
+firewall do host
     +
-Docker firewall
+firewall do Docker
     +
 container
     +
-Vaultwarden authentication
+autenticação do Vaultwarden
     +
 TOTP
     +
-encrypted vault
+cofre criptografado
 ```
 
 ---
 
-# 53. OpenCode Instructions
+# 53. Instruções para o OpenCode
 
-When working on this repository, OpenCode must follow these rules:
+Ao trabalhar neste repositório, o OpenCode deve seguir estas regras:
 
-- Treat `PROJECT_CONTEXT.md` as the authoritative project context.
-- Do not invent infrastructure that is not documented.
-- Do not replace existing architecture without explicit justification.
-- Do not introduce additional services merely for convention or appearance.
-- Do not remove security controls without documenting why.
-- Do not store secrets in the repository.
-- Never generate or commit private keys.
-- Never generate or commit real `.env` files containing secrets.
-- Never generate or commit real Vaultwarden database files.
-- Never generate or commit real backups.
-- Clearly distinguish CURRENT, PLANNED, and DEPRECATED configuration.
-- When modifying production configuration, first validate the change.
-- Prefer reproducible configuration over manual procedures.
-- Keep production configuration and documentation synchronized.
-- Update this project context when an architectural decision changes.
-- Never claim a backup, restore test, security control, or monitoring system is
-  implemented unless it has actually been tested.
-- When uncertain about the current state, inspect the actual host/configuration
-  rather than guessing.
+- Tratar `PROJECT_CONTEXT.md` como o contexto autoritativo do projeto.
+- Não inventar infraestrutura que não esteja documentada.
+- Não substituir a arquitetura existente sem justificativa explícita.
+- Não introduzir serviços adicionais meramente por convenção ou aparência.
+- Não remover controles de segurança sem documentar o motivo.
+- Não armazenar segredos no repositório.
+- Nunca gerar ou comitar chaves privadas.
+- Nunca gerar ou comitar arquivos `.env` reais contendo segredos.
+- Nunca gerar ou comitar arquivos reais de banco de dados do Vaultwarden.
+- Nunca gerar ou comitar backups reais.
+- Diferenciar claramente o que é configuração ATUAL, PLANEJADA e OBSOLETA.
+- Ao modificar a configuração de produção, primeiro validar a alteração.
+- Preferir configuração reproduzível a procedimentos manuais.
+- Manter a configuração de produção e a documentação sincronizadas.
+- Atualizar este contexto de projeto sempre que uma decisão arquitetural for alterada.
+- Nunca declarar que um backup, teste de restauração, controle de segurança ou sistema de monitoramento está implementado a menos que tenha sido efetivamente testado.
+- Quando em dúvida sobre o estado atual, inspecionar o host/configuração real em vez de adivinhar.

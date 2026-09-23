@@ -163,44 +163,54 @@ O backup off-site provê salvaguarda independente fora da infraestrutura física
 - **Interface de Acesso:** API compatível com S3
 - **ID do Repositório Restic:** `7bbbe221`
 - **Criptografia Client-side:** Todos os dados são criptografados pelo Restic antes do envio pela rede, impedindo qualquer acesso não autorizado ao conteúdo do cofre em nuvem.
-- **Sigilo de Credenciais:** As credenciais OCI (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) e a senha mestra do repositório (`RESTIC_PASSWORD`) são mantidas estritamente isoladas na VM e **NUNCA** são expostas no Git.
+- **Sigilo de Credenciais:** As credenciais OCI (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) e a senha mestra do repositório (`RESTIC_PASSWORD`) são mantidas estritamente isoladas no arquivo `/etc/vaultwarden-backup/oci.env` e **NUNCA** são expostas no Git.
 
-### 4.2. Ciclo de Validação do Restic
+### 4.2. Script de Automação Off-site (`vaultwarden-offsite-backup`)
 
-O repositório foi homologado através do seguinte ciclo de testes:
-1. **Inicialização:** Repositório Restic inicializado com sucesso via `restic init`.
-2. **Checagem Inicial:** Executado `restic check` sem erros.
-3. **Upload de Teste:** Snapshot inicial de teste enviado com sucesso.
-4. **Restore de Teste:** Restauração do snapshot de teste executada e conteúdo validado.
-5. **Expurgo de Teste:** Snapshot temporário descartado e expurgado com `restic forget --prune`.
-6. **Checagem Pós-Expurgo:** Verificação de integridade via `restic check` concluída com zero erros.
+O script `/usr/local/sbin/vaultwarden-offsite-backup` (versionado no repositório em `backup/vaultwarden-offsite-backup`) executa as seguintes etapas:
+1. **Controle de Concorrência (Lock):** Adquire lock exclusivo em `/run/lock/vaultwarden-offsite-backup.lock`.
+2. **Carregamento de Ambiente:** Carrega variáveis a partir de `/etc/vaultwarden-backup/oci.env`.
+3. **Verificação do Backup Local Recente:** Busca em `/var/backups/vaultwarden/` por backups gerados nos últimos 120 minutos (`find -mmin -120`), realizando até 60 tentativas (intervalo de 30s) para garantir sincronia com a finalização do backup local.
+4. **Validação de Checksum Local:** Executa `sha256sum -c "${LATEST}.sha256"` antes de iniciar o upload.
+5. **Upload via Restic:** Executa `restic -o s3.bucket-lookup=path backup /var/backups/vaultwarden`.
+6. **Aplicação da Retenção Remota (10 Dias):** Aplica a política de retenção remota através de:
+   ```bash
+   restic -o s3.bucket-lookup=path forget --keep-within 10d --prune
+   ```
+7. **Auditoria de Integridade:** Valida a consistência criptográfica com:
+   ```bash
+   restic -o s3.bucket-lookup=path check
+   ```
 
-### 4.3. Upload Real de Produção
+### 4.3. Unidades Systemd do Backup Off-site
 
-- **Arquivo Local Utilizado:** `/var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz`.
-- **Modo de Execução:** O upload foi executado **MANUALMENTE**.
-- **Snapshot Restic Real:** `d5f61547`.
-- **Validação de Integridade Pós-Upload:** `restic check` concluído com:
-  ```text
-  no errors were found
-  ```
+As definições estão versionadas no repositório em `backup/` e instaladas em `/etc/systemd/system/`:
 
-### 4.4. Teste Real de Restauração a partir do OCI
+- **Service Unit (`/etc/systemd/system/vaultwarden-offsite-backup.service`):**
+  - `Type=oneshot`
+  - `After=vaultwarden-backup.service`
+  - `ExecStart=/usr/local/sbin/vaultwarden-offsite-backup`
+  - `Environment=HOME=/root`: Garante definição de diretório home para o Restic, eliminando o aviso de diretório de cache inexistente durante execuções pelo systemd.
+  - `UMask=0077`, `NoNewPrivileges=true`, `TimeoutStartSec=60min`.
 
-- **Ambiente de Teste:** Executado em diretório temporário isolado: `/tmp/restic-vaultwarden-restore`.
-- **Restauração:** Snapshot `d5f61547` restaurado a partir do OCI.
-- **Artefatos Recuperados:** 17 arquivos/diretórios restaurados com sucesso.
-- **Arquivo de Backup Recuperado:** `vaultwarden_20260923_181123.tar.gz`.
-- **Validação de Checksum SHA-256:**
-  - Hash calculado no arquivo restaurado: `fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40`.
-  - O hash coincidiu rigorosamente com o arquivo `.sha256` armazenado.
-- **Conteúdo Estrutural:** O arquivo TAR restaurado foi inspecionado, confirmando a integridade de `./db.sqlite3` e `./rsa_key.pem`.
-- **Limpeza e Isolamento:** O diretório temporário `/tmp/restic-vaultwarden-restore` foi removido imediatamente após a validação. A instância produtiva do Vaultwarden não foi substituída nem alterada durante o teste.
+- **Timer Unit (`/etc/systemd/system/vaultwarden-offsite-backup.timer`):**
+  - `OnCalendar=*-*-* 03:30:00`: Programado diariamente às 03:30 (30 minutos após o backup local das 03:00).
+  - `Persistent=true`: Disparo garantido caso o host esteja indisponível no horário agendado.
+  - `WantedBy=timers.target`: Habilitado na inicialização do sistema.
 
-### 4.5. Ressalvas Importantes sobre o Estado Atual
-- **Upload Manual:** O envio do backup ao OCI foi realizado manualmente via linha de comando.
-- **Automação Pendente:** A automação diária do envio para o OCI (serviço/timer systemd) ainda **NÃO** foi implementada.
-- **Retenção Remota Pendente:** A política de expurgo periódico de snapshots antigos no OCI ainda não foi automatizada.
+### 4.4. Estado Validado da Automação Off-site
+
+- [x] O repositório Restic foi inicializado com sucesso e o check inicial executou sem erros.
+- [x] Teste inicial de upload, restore e expurgo (`forget --prune`) concluído sem erros.
+- [x] A execução MANUAL do serviço `vaultwarden-offsite-backup.service` foi validada com sucesso via `sudo systemctl start vaultwarden-offsite-backup.service`.
+- [x] O serviço localizou o backup local recente em `/var/backups/vaultwarden/`.
+- [x] O checksum SHA-256 do backup local foi validado com sucesso.
+- [x] Snapshot Restic real criado no bucket privado do OCI.
+- [x] `restic check` concluído com sucesso (`no errors were found`).
+- [x] Retenção remota de 10 dias (`forget --keep-within 10d --prune`) executada com sucesso.
+- [x] Aviso de cache do Restic corrigido com a inclusão de `Environment=HOME=/root` na service unit.
+- [x] A restauração de dados reais a partir do OCI já havia sido validada previamente em ambiente temporário isolado (`/tmp/restic-vaultwarden-restore`), com validação do SHA-256 e arquivos `db.sqlite3` e `rsa_key.pem`.
+- [ ] *Ressalva importante sobre o timer off-site:* A execução automática do timer `vaultwarden-offsite-backup.timer` às 03:30 ainda **NÃO** foi observada em regime de produção. Portanto, o timer está documentado como "configurado e validado manualmente", mas **NÃO** como "execução automática validada". A execução automática do backup local das 03:00 já foi observada e permanece validada.
 
 ---
 
@@ -229,18 +239,30 @@ tar -tzvf /var/backups/vaultwarden/vaultwarden_20260923_181123.tar.gz
 - `./rsa_key.pem`
 - `./icon_cache/`
 
-### 5.4. Verificar Status do Timer e Próximo Disparo
+### 5.4. Verificar Status do Timer Local e Próximo Disparo
 ```bash
 sudo systemctl status vaultwarden-backup.timer
-sudo systemctl list-timers | grep vaultwarden
+sudo systemctl list-timers | grep vaultwarden-backup
 ```
 
-### 5.5. Consultar Logs da Última Execução do Serviço
+### 5.5. Consultar Logs da Última Execução do Serviço Local
 ```bash
 sudo journalctl -u vaultwarden-backup.service --no-pager -n 50
 ```
 
-### 5.6. Consultar Snapshots e Integridade no OCI (Restic)
+### 5.6. Verificar Status do Timer Off-site e Logs do Serviço
+```bash
+sudo systemctl status vaultwarden-offsite-backup.timer
+sudo systemctl list-timers | grep vaultwarden-offsite
+sudo journalctl -u vaultwarden-offsite-backup.service --no-pager -n 50
+```
+
+### 5.7. Disparo Manual do Serviço Off-site
+```bash
+sudo systemctl start vaultwarden-offsite-backup.service
+```
+
+### 5.8. Consultar Snapshots e Integridade no OCI (Restic)
 ```bash
 # Listar snapshots no bucket OCI
 restic snapshots
@@ -256,18 +278,19 @@ restic check
 ### ✅ Estado Atual Testado e Validado em Produção
 - [x] Backup local diário via systemd (execução noturna observada em 23/09/2026 com `vaultwarden_20260923_030040.tar.gz`).
 - [x] Retenção local de 10 dias (`RETENTION_DAYS=10`, expurgo automático de pares `.tar.gz` e `.sha256` pós-backup).
-- [x] Integridade SHA-256 (validação via `sha256sum -c` e `tar -tzf`).
+- [x] Integridade SHA-256 local (`sha256sum -c` e `tar -tzf`).
 - [x] Restore local (validação funcional em ambiente temporário isolado sem impacto na produção).
 - [x] Snapshot de baseline da VM no Proxmox VE / PBS validado com sucesso.
 - [x] Restic repository OCI (inicializado com sucesso em bucket privado `vaultwarden-offsite`, ID `7bbbe221`).
-- [x] Upload real para OCI (backup real `vaultwarden_20260923_181123.tar.gz` enviado com snapshot `d5f61547`, executado manualmente).
-- [x] `restic check` (verificações inicial, pós-prune e pós-upload concluídas com `no errors were found`).
+- [x] Upload real para OCI via Restic (`vaultwarden-offsite-backup` com validação de checksum prévia).
+- [x] `restic check` (verificações concluídas com `no errors were found`).
+- [x] Retenção remota de 10 dias no OCI (`restic forget --keep-within 10d --prune` executado e validado com sucesso).
+- [x] Automação off-site via systemd (`vaultwarden-offsite-backup.service` e `vaultwarden-offsite-backup.timer` diariamente às 03:30, execução manual do service validada com sucesso; cache corrigido com `Environment=HOME=/root`).
 - [x] Restore de backup real a partir do OCI (recuperação do snapshot `d5f61547` para `/tmp/restic-vaultwarden-restore` com 17 itens, sem substituir ou alterar a produção).
 - [x] Validação do SHA-256 do backup recuperado (`fc40c0ae6da319aa89283632fb0aea58ab4f2ce286e578beb6dc167631b1ce40` idêntico ao `.sha256` armazenado).
 
 ### ⚠️ Melhorias Futuras / Evolução (Planejado)
-- [ ] **Automação do upload off-site:** Criação de timer e serviço systemd para envio diário automatizado ao repositório OCI.
-- [ ] **Política de retenção do repositório Restic:** Automação de expurgo (`restic forget --prune`) de snapshots antigos na nuvem.
-- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas do timer de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
+- [ ] **Observação da execução automática do timer off-site:** Registro da primeira execução real noturna disparada automaticamente pelo timer às 03:30 (timer configurado e com execução manual validada).
+- [ ] **Monitoramento centralizado:** Configuração de monitoramento centralizado e alertas dos timers de backup e métricas de integridade (melhoria futura; atualmente não existe servidor Zabbix no ambiente).
 - [ ] **Teste completo de disaster recovery:** Simulação ponta a ponta de perda total da VM e reconstrução em outro hypervisor.
 - [ ] **Verificação periódica de restore:** Formalização e execução de cronograma de rotinas regulares de testes de recuperação.

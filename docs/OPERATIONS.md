@@ -185,8 +185,20 @@ sudo find /var/backups/vaultwarden -maxdepth 1 -type f -name 'vaultwarden_*.tar.
 - **Evolução Futura:** A ausência de alertas ativos remotos em caso de falha é uma limitação operacional conhecida; a integração com Zabbix é classificada como melhoria futura / evolução e não impacta o funcionamento do backup local implementado.
 
 ### 5.7. Operação e Auditoria do Repositório OCI (Restic)
-O repositório em nuvem no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket privado `vaultwarden-offsite`, ID `7bbbe221`) utiliza criptografia client-side gerenciada pelo Restic.
+O repositório em nuvem no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket privado `vaultwarden-offsite`, ID `7bbbe221`) utiliza criptografia client-side gerenciada pelo Restic e automação systemd configurada para 03:30 diariamente.
 
+- **Status do Timer Off-site:**
+  ```bash
+  sudo systemctl status vaultwarden-offsite-backup.timer
+  ```
+- **Disparo Manual do Envio Off-site via Systemd:**
+  ```bash
+  sudo systemctl start vaultwarden-offsite-backup.service
+  ```
+- **Acompanhamento dos Logs do Serviço Off-site:**
+  ```bash
+  sudo journalctl -u vaultwarden-offsite-backup.service --no-pager -n 50
+  ```
 - **Listar Snapshots no OCI:**
   ```bash
   restic snapshots
@@ -195,11 +207,22 @@ O repositório em nuvem no Oracle Cloud Infrastructure (`sa-saopaulo-1`, bucket 
   ```bash
   restic check
   ```
+- **Política de Retenção Remota (10 Dias):**
+  A retenção remota é executada automaticamente pelo script após cada backup bem-sucedido:
+  ```bash
+  restic forget --keep-within 10d --prune
+  ```
 - **Restauração de Teste em Diretório Isolado:**
   ```bash
   restic restore <snapshot_id> --target /tmp/restic-vaultwarden-restore
   ```
-- **Atenção Operacional:** O upload real para o OCI foi executado **manualmente** nesta etapa. A automação diária do envio e a política de retenção do repositório Restic (`forget --prune`) ainda não foram implementadas no systemd e permanecem como melhorias futuras. As credenciais OCI e senha do Restic residem exclusivamente no host e nunca devem ser versionadas no Git.
+- **Nota Operacional sobre Cache do Restic no Systemd:**
+  O systemd não define `$HOME` para serviços `Type=oneshot` por padrão, o que causava um aviso de cache (`unable to open cache ...`). A unidade de serviço define explicitamente `Environment=HOME=/root`, corrigindo a localização do cache em `/root/.cache/restic`.
+- **Atenção Operacional e Status de Validação:**
+  - O script `/usr/local/sbin/vaultwarden-offsite-backup` localiza o backup local mais recente (`-mmin -120`), valida o checksum `.sha256`, envia o snapshot via Restic ao OCI, executa `restic check` e aplica a retenção remota de 10 dias (`forget --keep-within 10d --prune`).
+  - A execução manual do serviço (`systemctl start vaultwarden-offsite-backup.service`) foi executada e validada com sucesso em produção.
+  - A **execução automática** agendada via timer (`03:30:00`) ainda **NÃO foi observada** em produção (a ser confirmada no próximo ciclo agendado). Portanto, o timer está documentado como configurado e validado manualmente, mas não como execução automática validada.
+  - As credenciais OCI e senha do Restic residem exclusivamente no host (`/etc/vaultwarden/oci.env` com permissão `0600`) e nunca devem ser versionadas no Git.
 
 ---
 
@@ -240,4 +263,5 @@ Para evitar diagnósticos incorretos, mantenha em mente que estas situações re
 | **Acesso Web Vault OK** | Serviço acessível publicamente | Backups estão sendo gerados ou são válidos |
 | **Arquivo .tar.gz gerado** | Script de backup local foi executado | Dados são íntegros ou recuperáveis em caso de desastre |
 | **Restore Local Testado** | Recuperação local validada em teste prático isolado | Envio para nuvem ou proteção contra desastres físicos |
-| **Restore a partir do OCI Testado** | Recuperação externa validada a partir da nuvem | Automação do envio diário OCI ou disaster recovery completo |
+| **Restore a partir do OCI Testado** | Recuperação externa validada a partir da nuvem | Execução automática do timer OCI às 03:30 observada ou disaster recovery completo |
+| **Backup Off-site OCI (Restic)** | Envio à nuvem, integridade SHA-256/Restic e retenção remota de 10 dias validados manualmente | Execução automática agendada às 03:30 ainda não foi observada em produção |

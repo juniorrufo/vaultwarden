@@ -209,4 +209,4 @@ Recriar a stack Compose `/opt/vaultwarden/docker-compose.yaml` com o digest imut
 | :--- | :--- | :--- | :--- |
 | **Camada 1: Dados da Aplicação** | Corrupção de banco SQLite ou deleção acidental de `/data` | Restaurar arquivo `.tar.gz` local sobre `/opt/vaultwarden/data` | ✅ Testado e Validado |
 | **Camada 2: VM Inteira** | Falha de SO Debian, kernel panic ou crash do disco virtual | Restaurar snapshot completo da VM no Proxmox VE via PBS | ✅ Testado e Validado |
-| **Camada 3: Perda do Site / Hypervisor** | Destruição física do Proxmox / perda total da residência | Reconstruir host Debian e restaurar backup criptografado do OCI via Restic | ✅ Restore do OCI testado e validado em ambiente isolado (Automação do envio e DR ponta a ponta planejados) |
+| **Camada 3: Perda do Site / Hypervisor** | Destruição física do Proxmox / perda total da residência | Reconstruir host Debian e restaurar backup criptografado do OCI via Restic | ✅ Restore do OCI testado e validado em ambiente isolado (Automação do envio implementada e validada manualmente; DR ponta a ponta planejado) |

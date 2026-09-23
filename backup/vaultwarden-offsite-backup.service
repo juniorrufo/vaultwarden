@@ -1,0 +1,11 @@
+[Unit]
+Description=Vaultwarden Off-site Backup to OCI
+After=vaultwarden-backup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vaultwarden-offsite-backup
+Environment=HOME=/root
+UMask=0077
+NoNewPrivileges=true
+TimeoutStartSec=60min

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Vaultwarden Off-site Backup to OCI
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=vaultwarden-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

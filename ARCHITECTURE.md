@@ -266,7 +266,7 @@ A resiliência da infraestrutura apoia-se em níveis complementares e desacoplad
 
 1. **Aplicação (Local):** O script `/usr/local/sbin/vaultwarden-backup` aciona o backup nativo do SQLite (`docker exec vaultwarden /vaultwarden backup`), interrompe o container graciosamente, empacota `/opt/vaultwarden/data` em `/var/backups/vaultwarden/*.tar.gz` (excluindo journals e temporários), gera hash SHA-256, valida integridade estrutural via `tar -tzf`, reinicia o container e aplica a retenção local de 10 dias (`RETENTION_DAYS=10`). A automação via `vaultwarden-backup.timer` (03:00 diário) teve execução noturna real validada (`vaultwarden_20260923_030040.tar.gz`).
 2. **Sistema Operacional (Proxmox):** Snapshot completo do estado baseline da VM validado via Proxmox Backup Server (PBS).
-3. **Desastre Externo (Off-site na Nuvem - OCI via Restic):** Repositório Restic (ID `7bbbe221`) hospedado em bucket privado no Oracle Cloud Infrastructure (`sa-saopaulo-1`, namespace `groqo9fbzuaz`, compartment `Backups`, bucket `vaultwarden-offsite`, via API S3-compatible). O Restic realiza criptografia client-side antes da transmissão. O envio do backup real `vaultwarden_20260923_181123.tar.gz` (snapshot `d5f61547`) foi executado manualmente e verificado via `restic check`. A restauração de desastre foi homologada com sucesso em ambiente temporário isolado (`/tmp/restic-vaultwarden-restore`), com validação exata do hash SHA-256 e integridade dos arquivos (`db.sqlite3` e `rsa_key.pem`), sem afetar a produção. A automação diária do upload OCI e a política de retenção remota são evoluções futuras.
+3. **Desastre Externo (Off-site na Nuvem - OCI via Restic):** Repositório Restic (ID `7bbbe221`) hospedado em bucket privado no Oracle Cloud Infrastructure (`sa-saopaulo-1`, namespace `groqo9fbzuaz`, compartment `Backups`, bucket `vaultwarden-offsite`, via API S3-compatible). O Restic aplica criptografia client-side antes da transmissão. A rotina é orquestrada pelo script `/usr/local/sbin/vaultwarden-offsite-backup`, serviço systemd `vaultwarden-offsite-backup.service` (`Environment=HOME=/root`) e timer diário `vaultwarden-offsite-backup.timer` (03:30, `Persistent=true`). O script consome o backup local de `/var/backups/vaultwarden/`, valida o checksum SHA-256 antes da transmissão, envia os dados, aplica retenção remota de 10 dias (`forget --keep-within 10d --prune`) e audita o repositório com `restic check`. A execução manual do serviço foi validada com sucesso; o disparo automático do timer às 03:30 aguarda observação noturna. A restauração foi homologada com sucesso em ambiente isolado (`/tmp/restic-vaultwarden-restore`), com validação exata do hash SHA-256 e integridade de `./db.sqlite3` e `./rsa_key.pem`, sem afetar a produção.
 
 ### Diagrama de Relacionamento de Backup:
 
@@ -280,7 +280,8 @@ A resiliência da infraestrutura apoia-se em níveis complementares e desacoplad
 |  /var/backups/vaultwarden/*.tar.gz                                 |
 |         │  (Retenção local: 10 dias)                               |
 |         │                                                          |
-|         ▼ (Restic: criptografia client-side - execução manual)     |
+|         ▼ (vaultwarden-offsite-backup.service via timer 03:30)     |
+|         │ (Restic: criptografia client-side + retenção remota 10d) |
 +---------┼----------------------------------------------------------+
           │
           ▼ (HTTPS / API S3-compatible)
@@ -288,6 +289,6 @@ A resiliência da infraestrutura apoia-se em níveis complementares e desacoplad
 |                Oracle Cloud Infrastructure (OCI)                   |
 |  Região: sa-saopaulo-1 | Compartment: Backups                      |
 |  Bucket privado: vaultwarden-offsite                               |
-|  Restic Repository ID: 7bbbe221                                    |
+|  Restic Repository ID: 7bbbe221 (Retenção remota: 10 dias)         |
 +--------------------------------------------------------------------+
 ```

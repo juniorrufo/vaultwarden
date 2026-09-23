@@ -1,6 +1,8 @@
 # Environment variables and deployment secrets
 .env
 .env.*
+*.env
+oci.env
 !.env.example
 
 # SQLite databases, WAL and SHM journal files

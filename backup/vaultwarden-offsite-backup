@@ -1,0 +1,82 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+BACKUP_DIR="/var/backups/vaultwarden"
+ENV_FILE="/etc/vaultwarden-backup/oci.env"
+RETENTION="10d"
+LOCK_FILE="/run/lock/vaultwarden-offsite-backup.lock"
+
+exec 9>"${LOCK_FILE}"
+flock -n 9 || {
+    echo "Outro backup off-site do Vaultwarden já está em execução."
+    exit 1
+}
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+    echo "Arquivo de ambiente não encontrado: ${ENV_FILE}"
+    exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+latest_backup() {
+    find "${BACKUP_DIR}" \
+        -maxdepth 1 \
+        -type f \
+        -name 'vaultwarden_*.tar.gz' \
+        -printf '%T@ %p\n' \
+        | sort -nr \
+        | head -n1 \
+        | cut -d' ' -f2-
+}
+
+echo "Verificando backup local recente..."
+
+LATEST=""
+for _ in {1..60}; do
+    LATEST="$(latest_backup || true)"
+
+    if [[ -n "${LATEST}" ]] && \
+       [[ -f "${LATEST}.sha256" ]] && \
+       find "${LATEST}" -mmin -120 | grep -q .; then
+        break
+    fi
+
+    echo "Aguardando backup local recente..."
+    sleep 30
+done
+
+if [[ -z "${LATEST}" ]] || \
+   [[ ! -f "${LATEST}" ]] || \
+   [[ ! -f "${LATEST}.sha256" ]] || \
+   ! find "${LATEST}" -mmin -120 | grep -q .; then
+    echo "Nenhum backup local recente foi encontrado."
+    exit 1
+fi
+
+echo "Backup local encontrado:"
+echo "  ${LATEST}"
+
+echo "Validando checksum do backup local..."
+sha256sum -c "${LATEST}.sha256"
+
+echo "Enviando backups locais para o OCI..."
+restic \
+    -o s3.bucket-lookup=path \
+    backup "${BACKUP_DIR}"
+
+echo "Aplicando retenção remota de ${RETENTION}..."
+restic \
+    -o s3.bucket-lookup=path \
+    forget \
+    --keep-within "${RETENTION}" \
+    --prune
+
+echo "Verificando integridade do repositório Restic..."
+restic \
+    -o s3.bucket-lookup=path \
+    check
+
+echo "Backup off-site concluído com sucesso."
